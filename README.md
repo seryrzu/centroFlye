@@ -11,7 +11,7 @@ Certain steps of the algorithm are highly computationally and/or memory intensiv
 
 
 ## Availability
-Final assembly and intermediate results are published at ZENODO. TODO
+Final assembly and all intermediate results of the pipeline described below are published at ZENODO. TODO
 
 
 ## Dependencies
@@ -33,7 +33,7 @@ The detailed information about the algorithm can be found in the paper.
 
 Please, run all commands from the root of the repository.
 Results of all steps (except step 4) will be stored at `results` directory.
-Result of step 4 is stored at ``supplementary_data/DXZ1_rc_star.fasta``.
+Result of step 4 will be stored at ``supplementary_data/DXZ1_rc_star.fasta``.
 
 ### 1. Recruitment of centromeric reads
 
@@ -56,7 +56,7 @@ bash scripts/read_recruitment/run_read_recruitment.sh \
 
 ### 2. Partitioning centromeric reads into units, where each unit represents a HOR copy
 At this step we are utilizing centromeric reads from step 1 and run NCRF on them (``<path_to_NCRF>`` is where NCRF binary is located).
-The result of this step is NCRF report on all centromeric reads that is stored at ``results/NCRF_rc/report.ncrf``.
+The result of this step is NCRF report on all centromeric reads that will be stored at ``results/NCRF_rc/report.ncrf``.
 The following command uses 50 threads.
 
 ```
@@ -71,7 +71,6 @@ python scripts/run_ncrf_parallel.py \
 ### 3. Recruitment of unique k-mers
 At this step we first recruit rare 19-mers and then use distance graph to filter out non-unique 19-mers (details can be found in the paper).
 Current implementation requires around 1TB of RAM.
-If you do not wish to run it yourself, the result is available at ZENODO (see Availability).
 The following command uses NCRF reports from step 2 and reports unique kmers to ``results/recruited_unique_kmers/unique_kmers_min_edge_cov_5_RC.txt``.
 
 ```
@@ -83,8 +82,7 @@ bash scripts/unique_kmer_recruitment/unique_kmer_recruitment.sh \
 ### 4. DXZ1 array resolution (main part)
 At this step we use partitioning of reads into units provided by NCRF at step 2 and unique 19-mer recruited at step 3.
 Note, that this step only reports the "placement" of centromeric reads in the (yet unknown) sequence of centromere X (details can be found in the paper).
-The resulting placement is available at ``results/tr_resolution/read_positions.csv``.
-The result of this step is available at the ZENODO.
+The resulting placement will be stored at ``results/tr_resolution/read_positions.csv``.
 
 ```
 python scripts/read_placer.py \
