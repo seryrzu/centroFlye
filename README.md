@@ -112,7 +112,7 @@ After running this step, the final assembly is located at ``results/polishing/fi
 
 ```
 python scripts/eltr_polisher.py \
-              --read-placement results/tr_resolution/tr_resolution_5_RC_freqkmers2/read_positions.csv \
+              --read-placement results/tr_resolution/read_positions.csv \
               --outdir results/polishing \
               --ncrf results/NCRF_rc/report.ncrf \
               --output-progress \
