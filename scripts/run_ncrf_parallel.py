@@ -1,29 +1,42 @@
-#(c) 2019 by Authors
-#This file is a part of centroFlye program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2019 by Authors
+# This file is a part of centroFlye program.
+# Released under the BSD license (see LICENSE file)
 
 import argparse
 import os
 from subprocess import call, Popen, PIPE
 from utils.bio import read_bio_seqs, read_bio_seq, write_bio_seqs
-from utils.various import chunks
+from utils.various import chunks2
 from utils.os_utils import smart_makedirs
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--reads", help="Path to centromeric reads in fasta format", required=True)
-    parser.add_argument("--repeat", help="Path to the unit sequence", required=True)
-    parser.add_argument("-t", "--threads", help="Number of threads", type=int, default=30)
-    parser.add_argument("-o", "--outdir", help="Output directory", required=True)
-    parser.add_argument("--ncrf-bin", help="Path to binary of NCRF", required=True)
+    parser.add_argument("--reads",
+                        help="Path to centromeric reads in fasta format",
+                        required=True)
+    parser.add_argument("--repeat",
+                        help="Path to the unit sequence",
+                        required=True)
+    parser.add_argument("-t",
+                        "--threads",
+                        help="Number of threads",
+                        type=int,
+                        default=30)
+    parser.add_argument("-o",
+                        "--outdir",
+                        help="Output directory",
+                        required=True)
+    parser.add_argument("--ncrf-bin",
+                        help="Path to binary of NCRF",
+                        default='NCRF')
     params = parser.parse_args()
     smart_makedirs(params.outdir)
 
     repeat = read_bio_seq(params.repeat)
 
     reads = read_bio_seqs(params.reads)
-    reads_split = chunks(list(reads.keys()), params.threads)
+    reads_split = chunks2(list(reads.keys()), params.threads)
     reads_chunks_fn = {}
     for i in range(len(reads_split)):
         reads_chunk = {k: reads[k] for k in reads_split[i]}
@@ -41,7 +54,8 @@ def main():
         ncrf_report_fn = os.path.join(outdir, f'report_{i}.ncrf')
         with open(ncrf_report_fn, 'w') as f:
             p1 = Popen(['cat', fn], stdout=PIPE)
-            p2 = Popen([params.ncrf_bin, f'unit:{repeat}'], stdin = p1.stdout, stdout=f)
+            p2 = Popen([params.ncrf_bin, f'unit:{repeat}'],
+                       stdin=p1.stdout, stdout=f)
             ps.append(p2)
         ncrf_reports_fn.append(ncrf_report_fn)
     for p in ps:

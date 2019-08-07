@@ -1,5 +1,8 @@
+# (c) 2019 by Authors
+# This file is a part of centroFlye program.
+# Released under the BSD license (see LICENSE file)
+
 from Bio import SeqIO
-from read import Read
 import numpy as np
 from itertools import groupby
 
@@ -28,7 +31,7 @@ def RC(s):
 def write_bio_seqs(filename, seqs):
     with open(filename, 'w') as f:
         for seq_id, seq in seqs.items():
-            print('>' + seq_id, file=f)
+            print(f'>{seq_id}', file=f)
             print(seq, file=f)
 
 
