@@ -4,11 +4,13 @@
 
 import argparse
 
+import os
 import numpy as np
 from collections import defaultdict
 import heapq
 
 from utils.bio import read_bio_seq, write_bio_seqs
+from utils.os_utils import smart_makedirs
 from ncrf_parser import NCRF_Report
 
 import edlib
@@ -187,6 +189,9 @@ def get_polished_unit(k, most_frequent_kmers, kmer_counts_reads, unit_seq):
 
 def main():
     params = parse_args()
+    outdir = os.path.dirname(params.output)
+    smart_makedirs(outdir)
+
     reads_ncrf_report = NCRF_Report(params.reads_ncrf)
     unit_seq = read_bio_seq(params.unit)
 
