@@ -1,180 +1,210 @@
-#(c) 2019 by Authors
-#This file is a part of centroFlye program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2019 by Authors
+# This file is a part of centroFlye program.
+# Released under the BSD license (see LICENSE file)
 
 import argparse
 import os
-import math
-from collections import defaultdict, Counter
+import itertools
+import sys
+from collections import defaultdict
 from utils.os_utils import smart_makedirs
 from ncrf_parser import NCRF_Report
-from read_kmer_cloud import get_reads_kmer_clouds, filter_reads_kmer_clouds
+from read_kmer_cloud import get_reads_kmer_clouds
 
 
-def get_kmer_freqs_from_ncrf_reports(reads_ncrf_report, k=19, verbose=False):
-    all_kmers = defaultdict(int)
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ncrf', help='NCRF report on reads', required=True)
+    parser.add_argument('--coverage', help='Average coverage of the dataset',
+                        type=int, required=True)
+    parser.add_argument('--min-coverage',
+                        help='minCov threshold',
+                        type=int,
+                        required=True)
+    parser.add_argument('--outdir', help='Output directory', required=True)
+    parser.add_argument('-k', type=int, default=19)
+    parser.add_argument('--min-nreads', type=int, default=0)
+    parser.add_argument('--max-nreads', type=int, default=sys.maxsize)
+    parser.add_argument('--min-distance', type=int, default=1)
+    parser.add_argument('--max-distance', type=int, default=150)
+    parser.add_argument('--bottom', type=float, default=0.9)
+    parser.add_argument('--top', type=float, default=3.)
+    parser.add_argument('--kmer-survival-rate', type=float, default=0.34)
+    parser.add_argument('--max-nonuniq', type=int, default=3)
+    parser.add_argument('--verbose', action='store_true', default=True)
+    params = parser.parse_args()
+    return params
+
+
+def get_kmer_freqs_from_ncrf_report(reads_ncrf_report,
+                                    k, verbose,
+                                    max_nonuniq):
+    non_unique_freqs = defaultdict(int)
+    rare_freq = defaultdict(int)
     for i, (r_id, record) in enumerate(reads_ncrf_report.records.items()):
         if i % 100 == 0 and verbose:
             print(i + 1, len(reads_ncrf_report.records))
         r_al = record.r_al
         r_al = r_al.replace('-', '')
 
-        read_kmers = defaultdict(int)
+        read_freq = defaultdict(int)
         for i in range(len(r_al)-k+1):
             kmer = r_al[i:i+k]
-            read_kmers[kmer] += 1
-        for kmer, freq in read_kmers.items():
-            if freq == 1:
-                all_kmers[kmer] += 1
-    return all_kmers
+            read_freq[kmer] += 1
+
+        for kmer, freq in read_freq.items():
+            if freq > 1:
+                non_unique_freqs[kmer] += 1
+            if non_unique_freqs[kmer] <= max_nonuniq:
+                rare_freq[kmer] += 1
+            else:
+                if kmer in rare_freq:
+                    del rare_freq[kmer]
+    return rare_freq
 
 
-def get_kmer_dist_map(reads_kmer_clouds, kmers, min_n, max_n, verbose=False):
-    dist_tuples = Counter()
-    kmer_index = {}
-    index = 0
-    for kmer in kmers:
-        kmer_index[kmer] = index
-        index += 1
+def get_rare_kmers(reads_ncrf_report, k,
+                   bottom, top, coverage, kmer_survival_rate, max_nonuniq,
+                   verbose):
+    all_kmers = get_kmer_freqs_from_ncrf_report(reads_ncrf_report,
+                                                k=k,
+                                                verbose=verbose,
+                                                max_nonuniq=max_nonuniq)
+
+    left = bottom*coverage*kmer_survival_rate
+    right = top*coverage*kmer_survival_rate
+
+    rare_kmers = [kmer for kmer, freq in all_kmers.items()
+                  if left <= freq <= right]
+    rare_kmers = set(rare_kmers)
+    if verbose:
+        print(f'# rare kmers: {len(rare_kmers)}')
+    return rare_kmers
+
+
+def get_kmer_dist_map(reads_kmer_clouds, kmers,
+                      min_n, max_n,
+                      min_d, max_d,
+                      verbose):
+    def index_clouds(reads_kmer_clouds, min_n, max_n):
+        indexed_reads_kmer_clouds = {}
+        for r_id, kmer_clouds in \
+                itertools.islice(reads_kmer_clouds.items(), min_n, max_n):
+            kmers = kmer_clouds.kmers
+            indexed_read_kmer_clouds = []
+            for cloud in kmers:
+                indexed_cloud = [kmer_index[kmer] for kmer in cloud]
+                indexed_read_kmer_clouds.append(indexed_cloud)
+            indexed_reads_kmer_clouds[r_id] = indexed_read_kmer_clouds
+        return indexed_reads_kmer_clouds
 
     if verbose:
         print("Indexing")
-    indexed_reads_kmer_clouds = {}
-    for n, (r_id, kmer_clouds) in enumerate(reads_kmer_clouds.items()):
-        if n <= min_n:
-            continue
-        if n >= max_n:
-            break
-        indexed_read_kmer_clouds = []
-        kmers = kmer_clouds.kmers
-        if verbose:
-            print(n, len(kmers), len(reads_kmer_clouds.items()))
-        for cloud in kmers:
-            indexed_cloud = []
-            for kmer in cloud:
-                indexed_cloud.append(kmer_index[kmer])
-            indexed_read_kmer_clouds.append(indexed_cloud)
-        indexed_reads_kmer_clouds[r_id] = indexed_read_kmer_clouds
+    kmer_index = {kmer: i for i, kmer in enumerate(kmers)}
+    indexed_reads_kmer_clouds = index_clouds(reads_kmer_clouds, min_n, max_n)
 
     if verbose:
         print("Inferring distances")
-    for n, (r_id, kmer_clouds) in enumerate(indexed_reads_kmer_clouds.items()):
-        if verbose:
-            print(n, len(kmer_clouds), len(indexed_reads_kmer_clouds.items()))
-        for i in range(len(kmer_clouds)):
-            i_indexed_cloud = kmer_clouds[i]
-            for j in range(i + 1, len(kmer_clouds)):
-                j_indexed_cloud = kmer_clouds[j]
-                for ikmer_index in i_indexed_cloud:
-                    for jkmer_index in j_indexed_cloud:
-                        #kmer_pair = min(ikmer, jkmer), max(ikmer, jkmer)
-                        if ikmer_index != jkmer_index:
-                            dist_tuples[(j-i, ikmer_index, jkmer_index)] += 1
-    return dist_tuples, kmer_index
+    dist_cnt = {}
+
+    for dist in range(min_d, max_d + 1):
+        dist_cnt[dist] = [defaultdict(int) for i in range(len(kmers))]
+        dt = dist_cnt[dist]
+        for n, (r_id, kmer_clouds) in \
+                enumerate(indexed_reads_kmer_clouds.items()):
+            if verbose:
+                print(dist,
+                      n + min_n,
+                      len(kmer_clouds),
+                      len(indexed_reads_kmer_clouds.items()) + min_n)
+            for i, i_cloud in enumerate(kmer_clouds[:-dist]):
+                j_cloud = kmer_clouds[i+dist]
+                for i_index in i_cloud:
+                    for j_index in j_cloud:
+                        # assert i_index != j_index
+                        if i_index != j_index:
+                            dt[i_index][j_index] += 1
+    return dist_cnt, kmer_index
 
 
-def filter_dist_tuples(dist_tuples, min_coverage, max_dist=300, rel_threshold=0.8):
-    filtered_dist_tuples = {k: v for (k, v) in dist_tuples.items() if v >= min_coverage}
+def filter_dist_tuples(dist_cnt, min_coverage, rel_threshold=0.8):
+    candidate_edges = {}
+    for dist, dt in dist_cnt.items():
+        for i_index in range(len(dt)):
+            for j_index in dt[i_index]:
+                freq = dt[i_index][j_index]
+                if freq >= min_coverage:
+                    candidate_edges[(i_index, j_index, dist)] = freq
+
     selected_kmers = []
-    selected_tuples = []
-    for i, ((dist, kmer1, kmer2), val) in enumerate(filtered_dist_tuples.items()):
-        all_occ = sum(dist_tuples[(sec_dist, kmer1, kmer2)] for sec_dist in range(max_dist + 1))
-        if val / all_occ >= rel_threshold:
-            #print(dist, kmer1, kmer2, val)
-            selected_kmers.append(kmer1)
-            selected_kmers.append(kmer2)
-            selected_tuples.append((dist, kmer1, kmer2, val))
+    selected_edges = []
+    for (i_index, j_index, cand_dist), freq in candidate_edges.items():
+        all_occ = sum(dist_cnt[dist][i_index][j_index] for dist in dist_cnt)
+        if freq / all_occ >= rel_threshold:
+            selected_kmers.append(i_index)
+            selected_kmers.append(j_index)
+            selected_edges.append((cand_dist, i_index, j_index, freq))
     selected_kmers = set(selected_kmers)
-    return selected_kmers, selected_tuples
+    return selected_kmers, selected_edges
 
 
-def from_filtered_kmer_dist_map_to_kmers(filtered_dist_tuples):
-    kmer_pair2dist = {}
-    for i, ((dist, kmer1, kmer2), val) in enumerate(filtered_dist_tuples.items()):
-        all_occ = sum(dist_tuples[(sec_dist, kmer1, kmer2)] for sec_dist in range(1, 100))
-        if val / all_occ > 0.95:
-            #print(dist, kmer1, kmer2, val)
-            kmer_pair2dist[(kmer1, kmer2)] = dist
-
-    diff_distance = {}
-    for (kmer1, kmer2), read_dist in kmer_pair2dist.items():
-        if kmer1 not in genomic_kmer_positions or \
-            kmer2 not in genomic_kmer_positions:
-            continue
-        genome_dist = abs(genomic_kmer_positions[kmer1] - genomic_kmer_positions[kmer2])
-        diff_distance[(kmer1, kmer2)] = read_dist - genome_dist
-
-
-    dist_kmer_score = defaultdict(lambda: [0, 0])
-
-    for (kmer1, kmer2), dist in diff_distance.items():
-        if dist == 0:
-            dist_kmer_score[kmer1][0] += 1
-            dist_kmer_score[kmer2][0] += 1
-        else:
-            dist_kmer_score[kmer1][1] += 1
-            dist_kmer_score[kmer2][1] += 1
-
-    kmers_good_dist_score = set([kmer for kmer, sc in dist_kmer_score.items() \
-                     if (sc[0] >= 5 and sc[1] / (sc[0] + sc[1]) < 0.1)])
-
-    return kmers_good_dist_score
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--ncrf', help='NCRF report on reads', required=True)
-    parser.add_argument('--coverage', help='Average coverage of the dataset', type=int, required=True)
-    parser.add_argument('--min-coverages', help='Comma separated list of minCov thresholds', required=True)
-    parser.add_argument('--outdir', help='Output directory', required=True)
-    parser.add_argument('-k', type=int, default=19)
-    parser.add_argument('--min-nreads', type=int, default=0)
-    parser.add_argument('--max-nreads', type=int, default=math.inf)
-    params = parser.parse_args()
-
-    bottom, top = 0.9, 3
-    mean_survival_rate = 0.34
-    min_coverages = [int(x) for x in params.min_coverages.split(',')]
-    smart_makedirs(params.outdir)
-
-    reads_ncrf_report = NCRF_Report(params.ncrf)
-    all_kmers = get_kmer_freqs_from_ncrf_reports(reads_ncrf_report)
-
-    filtered_kmers = {k: v for k, v in all_kmers.items() \
-                    if bottom*params.coverage*mean_survival_rate <= v <= top*params.coverage*mean_survival_rate}
-    filtered_kmers_set = set(filtered_kmers.keys())
-    print(f'# rare kmers: {len(filtered_kmers_set)}')
-
-    reads_kmer_clouds = get_reads_kmer_clouds(reads_ncrf_report, n=1, k=params.k,
-                                              genomic_kmers=filtered_kmers_set)
-    dist_tuples, kmer_index = get_kmer_dist_map(reads_kmer_clouds,
-                                                filtered_kmers_set,
-                                                min_n=params.min_nreads,
-                                                max_n=params.max_nreads,
-                                                verbose=True)
-
-    unique_kmers = {}
-    selected_unique_tuples = {}
-    for min_coverage in min_coverages:
-        uk, sut = filter_dist_tuples(dist_tuples, min_coverage=min_coverage)
-        unique_kmers[min_coverage] = uk
-        selected_unique_tuples[min_coverage] = sut
-
+def output_results(kmer_index, min_coverage,
+                   unique_kmers_ind, dist_edges, outdir):
     kmer_index_reversed = {}
     for kmer, index in kmer_index.items():
         kmer_index_reversed[index] = kmer
 
-    for min_coverage, kmer_indexes in unique_kmers.items():
-        with open(os.path.join(params.outdir, f'unique_kmers_min_edge_cov_{min_coverage}_RC.txt'), 'w') as f:
-            kmers = [kmer_index_reversed[index] for index in kmer_indexes]
-            kmers = sorted(list(kmers))
-            for kmer in kmers:
-                print(kmer, file=f)
-        with open(os.path.join(params.outdir, f'unique_tuples_min_edge_cov_{min_coverage}_RC.txt'), 'w') as f:
-            sut = selected_unique_tuples[min_coverage]
-            for t in sut:
-                print(t[0], kmer_index_reversed[t[1]], kmer_index_reversed[t[2]], t[3], file=f)
+    kmers_out_fn = \
+        os.path.join(outdir, f'unique_kmers_min_edge_cov_{min_coverage}.txt')
+    with open(kmers_out_fn, 'w') as f:
+        kmers = [kmer_index_reversed[index] for index in unique_kmers_ind]
+        kmers = sorted(list(kmers))
+        for kmer in kmers:
+            print(kmer, file=f)
+    edges_out_fn = \
+        os.path.join(outdir, f'unique_edges_min_edge_cov_{min_coverage}.txt')
+    with open(edges_out_fn, 'w') as f:
+        for t in dist_edges:
+            print(t[0], kmer_index_reversed[t[1]],
+                  kmer_index_reversed[t[2]], t[3],
+                  file=f)
 
+
+def main():
+    params = parse_args()
+    smart_makedirs(params.outdir)
+
+    reads_ncrf_report = NCRF_Report(params.ncrf)
+    rare_kmers = get_rare_kmers(reads_ncrf_report,
+                                k=params.k,
+                                bottom=params.bottom,
+                                top=params.top,
+                                coverage=params.coverage,
+                                kmer_survival_rate=params.kmer_survival_rate,
+                                max_nonuniq=params.max_nonuniq,
+                                verbose=params.verbose)
+
+    reads_kmer_clouds = get_reads_kmer_clouds(reads_ncrf_report,
+                                              n=1,
+                                              k=params.k,
+                                              genomic_kmers=rare_kmers)
+
+    dist_cnt, kmer_index = get_kmer_dist_map(reads_kmer_clouds,
+                                             rare_kmers,
+                                             min_n=params.min_nreads,
+                                             max_n=params.max_nreads,
+                                             min_d=params.min_distance,
+                                             max_d=params.max_distance,
+                                             verbose=params.verbose)
+
+    unique_kmers_ind, dist_edges = \
+        filter_dist_tuples(dist_cnt, min_coverage=params.min_coverage)
+
+    output_results(kmer_index=kmer_index,
+                   min_coverage=params.min_coverage,
+                   unique_kmers_ind=unique_kmers_ind,
+                   dist_edges=dist_edges,
+                   outdir=params.outdir)
 
 
 if __name__ == "__main__":
