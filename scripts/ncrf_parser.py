@@ -1,10 +1,11 @@
-#(c) 2019 by Authors
-#This file is a part of centroFlye program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2019 by Authors
+# This file is a part of centroFlye program.
+# Released under the BSD license (see LICENSE file)
 
 import regex as re
 from utils.bio import RC
 from collections import defaultdict, namedtuple
+
 
 class NCRF_Report:
     class NCRF_Record:
@@ -37,7 +38,9 @@ class NCRF_Report:
                 return []
 
             # [start, end)
-            MotifAlignment = namedtuple('MotifAlignment', ['r_id', 'start', 'end', 'r_al', 'm_al'])
+            MotifAlignment = \
+                namedtuple('MotifAlignment',
+                           ['r_id', 'start', 'end', 'r_al', 'm_al'])
 
             coords = [match.start() for match in all_matches]
             coords.append(all_matches[-1].end())
@@ -48,10 +51,10 @@ class NCRF_Report:
             for st, en in zip(coords[:-1], coords[1:]):
                 ma = MotifAlignment(r_id=self.r_id,
                                     start=st, end=en,
-                                    r_al=self.r_al[st:en], m_al=self.m_al[st:en])
+                                    r_al=self.r_al[st:en],
+                                    m_al=self.m_al[st:en])
                 motif_alignments.append(ma)
             return motif_alignments
-
 
     def __init__(self, report_fn, min_record_len=5000, min_alignment_len=500):
         self.records = {}
@@ -93,7 +96,6 @@ class NCRF_Report:
                         r_st, r_en = r_len - r_en, r_len - r_st
                         r_al = RC(r_al)
                         m_al = RC(m_al)
-                    # self.longest_alignment_index[r_id] = len(self.positions_all_alignments[r_id]) - 1
                     self.records[r_id] = self.NCRF_Record(r_id=r_id,
                                                           r_len=r_len,
                                                           r_al_len=r_al_len,
@@ -113,7 +115,6 @@ class NCRF_Report:
             if r_id not in self.records:
                 self.discarded_reads.append(r_id)
 
-
     def classify(self, large_threshold=50000, small_threshold=1000):
         prefix_reads, suffix_reads, internal_reads = [], [], []
         for r_id, record in self.records.items():
@@ -128,11 +129,13 @@ class NCRF_Report:
                 last_alignment = self.positions_all_alignments[r_id][0]
                 left_pos = r_len - first_alignment[1]
                 right_pos = r_len - last_alignment[0]
-            if left_pos > large_threshold and right_pos > r_len - small_threshold \
+            if left_pos > large_threshold \
+                    and right_pos > r_len - small_threshold \
                     and right_pos == self.records[r_id].r_en:
 
                 prefix_reads.append(r_id)
-            elif right_pos < r_len - large_threshold and left_pos < small_threshold \
+            elif right_pos < r_len - large_threshold \
+                    and left_pos < small_threshold \
                     and left_pos == self.records[r_id].r_st:
                 suffix_reads.append(r_id)
             else:
