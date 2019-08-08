@@ -1,18 +1,20 @@
-#(c) 2019 by Authors
-#This file is a part of centroFlye program.
-#Released under the BSD license (see LICENSE file)
+# (c) 2019 by Authors
+# This file is a part of centroFlye program.
+# Released under the BSD license (see LICENSE file)
 
 import argparse
 import os
 import subprocess
 import math
+import statistics
 import edlib
 from collections import defaultdict
 from utils.os_utils import smart_makedirs
 from ncrf_parser import NCRF_Report
-from utils.bio import write_bio_seqs, read_bio_seq, read_bio_seqs, compress_homopolymer
+from utils.bio import write_bio_seqs, read_bio_seq, compress_homopolymer
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
+
 
 def read_reported_positions(read_positions_fn):
     pos = {}
@@ -40,15 +42,25 @@ class ELTR_Polisher:
         self.read_placement = read_reported_positions(params.read_placement)
         self.max_pos = self.params.max_pos
         self.min_pos = self.params.min_pos
+        if self.max_pos == math.inf:
+            self.max_pos = 0
+            for r_id, pos in self.read_placement.items():
+                if pos is None:
+                    continue
+                ma = self.motif_alignments[r_id]
+                self.max_pos = max(self.max_pos, pos + len(ma))
 
     def map_pos2read(self):
         pos2read = defaultdict(list)
         for r_id, pos in self.read_placement.items():
             if pos is None or pos > self.max_pos:
                 continue
-            record = self.ncrf_report.records[r_id]
             ma = self.motif_alignments[r_id]
-            for i in range(len(ma)):
+            if pos == self.min_pos or pos + len(ma) == self.max_pos:
+                positions = range(len(ma))
+            else:
+                positions = range(1, len(ma) - 1)
+            for i in positions:
                 if self.min_pos <= pos + i <= self.max_pos:
                     pos2read[pos + i].append((r_id, i))
         return pos2read
@@ -58,33 +70,42 @@ class ELTR_Polisher:
         for pos in pos2read:
             outdir = os.path.join(self.params.outdir, f'pos_{pos}')
             units_fn = os.path.join(outdir, 'read_units.fasta')
-            longest_read_unit_fn = os.path.join(outdir, 'longest_read_unit.fasta')
+            median_read_unit_fn = \
+                os.path.join(outdir, 'median_read_unit.fasta')
             smart_makedirs(outdir)
             seqs = {}
-            longest_read_unit, template_read = "", None
+            median_read_unit, template_read = "", None
             for (r_id, p) in pos2read[pos]:
                 r_al = self.motif_alignments[r_id][p].r_al
                 r_al = r_al.upper().replace('-', '')
                 seqs[f'gen_pos={pos}|r_id={r_id}|r_pos={p}'] = r_al
-                if len(r_al) >= len(longest_read_unit):
-                    longest_read_unit = r_al
+            r_units_lens = [len(seq) for seq in seqs.values()]
+            med_len = statistics.median_high(r_units_lens)
+            median_r_ids = []
+            for r_id in sorted(seqs.keys()):
+                r_al = seqs[r_id]
+                if len(r_al) == med_len:
+                    median_read_unit = r_al
                     template_read = r_id
+                    break
+            assert len(seqs[template_read]) == med_len
+            assert len(median_read_unit) == med_len
             write_bio_seqs(units_fn, seqs)
-            write_bio_seqs(longest_read_unit_fn, {template_read: longest_read_unit})
-            filenames[pos] = (units_fn, longest_read_unit_fn)
+            write_bio_seqs(median_read_unit_fn,
+                           {template_read: median_read_unit})
+            filenames[pos] = (units_fn, median_read_unit_fn)
         return filenames
 
     def run_polishing(self, read_unit_filenames):
-        polishing_wrapper_fn = os.path.join(current_dir, 'polishing_wrapper.py')
         min_pos = min(read_unit_filenames.keys())
         max_pos = max(read_unit_filenames.keys())
         for pos in range(min_pos, max_pos + 1):
             print(pos, max_pos)
-            units_fn, longest_read_unit_fn = read_unit_filenames[pos]
+            units_fn, median_read_unit_fn = read_unit_filenames[pos]
             pos_dir = os.path.dirname(units_fn)
-            cmd = ['flye',
+            cmd = [self.params.flye_bin,
                    f'--{self.params.error_mode}-raw', units_fn,
-                   '--polish-target', self.params.unit,
+                   '--polish-target', median_read_unit_fn,
                    '-i', self.params.num_iters,
                    '-t', self.params.num_threads,
                    '-o', pos_dir]
@@ -92,22 +113,7 @@ class ELTR_Polisher:
                 cmd.append('--output-progress')
             cmd = [str(x) for x in cmd]
             print(' '.join(cmd))
-            out = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            polished_seq_fn = os.path.join(pos_dir, f'polished_{self.params.num_iters}.fasta')
-            # if can't align to unit or alignment is too short -- align to the longest unit in reads
-            if out.decode("utf-8").find("No reads were aligned during polishing") != -1 or \
-                    len(read_bio_seq(polished_seq_fn)) < 0.7 * len(self.unit):
-                cmd = ['flye',
-                    f'--{self.params.error_mode}-raw', units_fn,
-                    '--polish-target', longest_read_unit_fn,
-                    '-i', self.params.num_iters,
-                    '-t', self.params.num_threads,
-                    '-o', pos_dir]
-                if self.params.output_progress:
-                    cmd.append('--output-progress')
-                cmd = [str(x) for x in cmd]
-                print(' '.join(cmd))
-                subprocess.check_call(cmd)
+            subprocess.check_call(cmd)
 
     def read_polishing(self, read_unit_filenames):
         min_pos = min(read_unit_filenames.keys())
@@ -120,7 +126,8 @@ class ELTR_Polisher:
                 polished_seq_fn = os.path.join(pos_dir, f'polished_{i}.fasta')
                 polished_seq = read_bio_seq(polished_seq_fn)
                 polished_seqs[pos] = polished_seq
-            final_sequence = [polished_seqs[pos] for pos in range(min_pos, max_pos + 1)]
+            final_sequence = \
+                [polished_seqs[pos] for pos in range(min_pos, max_pos + 1)]
             final_sequence = ''.join(final_sequence)
             final_sequences[i] = final_sequence
         return final_sequences
@@ -134,11 +141,11 @@ class ELTR_Polisher:
                 print(f'Alignment polishing seq {i} vs {i+1}:', file=f)
                 print(alignment, file=f)
 
-                hpc_seq_i, hpc_seq_i1 = compress_homopolymer(final_sequences[i]), compress_homopolymer(final_sequences[i+1])
+                hpc_seq_i = compress_homopolymer(final_sequences[i])
+                hpc_seq_i1 = compress_homopolymer(final_sequences[i+1])
                 alignment = edlib.align(hpc_seq_i, hpc_seq_i1)
                 print(f'Alignment homopolymer compressed polishing seq {i} vs {i+1}:', file=f)
                 print(alignment, file=f)
-
 
     def export_results(self, final_sequences):
         for i in range(1, self.params.num_iters + 1):
@@ -150,7 +157,6 @@ class ELTR_Polisher:
 
             final_hpc_fn = os.path.join(self.params.outdir, f'final_sequence_hpc_{i}.fasta')
             write_bio_seqs(final_hpc_fn, {f'polished_repeat_{i}': final_sequence_hpc})
-
 
     def run(self):
         pos2read = self.map_pos2read()
@@ -167,6 +173,7 @@ def main():
     parser.add_argument("--unit", required=True)
     parser.add_argument("--outdir", required=True)
     parser.add_argument("--ncrf", required=True)
+    parser.add_argument("--flye-bin", default='flye')
     parser.add_argument("--error-mode", default="pacbio")
     parser.add_argument("--num-iters", default=2, type=int)
     parser.add_argument("--num-threads", default=16, type=int)
