@@ -45,7 +45,7 @@ All intermediate and final results will then be placed in `<output directory>` (
 If you want to start from scratch you can simply remove this directory.
 
 **Required resources**:
-+ Storage space: ~150GB (mostly from the first step)
++ Storage space: ~150GB (mostly from the first step "Recruitment of centromeric reads", see below)
 + Clock time: ~9 hours (mostly recruitment of unique k-mers)
 + RAM: peak usage up to 800GB
 
