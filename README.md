@@ -3,8 +3,8 @@
 ### Version 0.8 (initial release)
 ## Overview
 centroFlye is an algorithm for centromere assembly using long error-prone reads.
-Here we show how to apply it for assembling the human X centromere.
-
+Currently it supports assembly of a human centromere X.
+Here we show how to apply it for the centromere X of the CHM13hTERT human cell line.
 
 
 ## Dependencies
@@ -45,7 +45,7 @@ All intermediate and final results will then be placed in `<output directory>` (
 If you want to start from scratch you can simply remove this directory.
 
 **Required resources**:
-+ Storage space: ~150GB (mostly from the first step)
++ Storage space: ~150GB (mostly from the first step "Recruitment of centromeric reads", see below)
 + Clock time: ~9 hours (mostly recruitment of unique k-mers)
 + RAM: peak usage up to 800GB
 
@@ -79,7 +79,7 @@ bash scripts/read_recruitment/run_read_recruitment.sh \
 **Required resources**:
 + Storage space: 150GB
 + Clock time: 1 hour
-+ RAM: < 50 MB
++ RAM: < 50MB
 
 ### 2. Partitioning centromeric reads into units, where each unit represents a HOR copy
 At this step we are utilizing centromeric reads from step 1 and run NCRF on them.
@@ -143,7 +143,7 @@ python scripts/better_consensus_unit_reconstruction.py \
 **Required resources**:
 + Storage space: < 1MB
 + Clock time: 5 mins
-+ RAM: 10 GB
++ RAM: 10GB
 
 ### 6. Polishing
 At this step we finally polish the constructed cenX sequence.
@@ -161,6 +161,10 @@ python scripts/eltr_polisher.py \
               --num-threads 50 \
               --unit results/DXZ1_star/DXZ1_rc_star.fasta
 ```
+**Required resources**:
++ Storage space: 200MB
++ Clock time: 1 hour
++ RAM: 2GB
 
 
 ## Publications
