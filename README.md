@@ -131,7 +131,7 @@ python scripts/read_placer.py \
 + Clock time: 2 mins
 + RAM: 2GB
 
-### 5. Obtaining a polished version of DXZ1 (DXZ1* in the paper) supported by centromeric reads.
+### 5. Obtaining a polished version of DXZ1 (DXZ1* in the paper) supported by centromeric reads
 The result of this step is stored at  `results/DXZ1_star/DXZ1_rc_star.fasta`.
 
 ```
