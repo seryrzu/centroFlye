@@ -1,6 +1,6 @@
 # centroFlye
 
-### Version 0.8 (initial release)
+### Version 0.8.3 (initial release)
 ## Overview
 centroFlye is an algorithm for centromere assembly using long error-prone reads.
 Currently it supports assembly of a human centromere X.
