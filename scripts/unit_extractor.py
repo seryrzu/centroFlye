@@ -117,7 +117,7 @@ def run_on_read(seq, seq_id, k, bin_size, outdir):
     cmd = ['flye',
            f'--nano-raw', splits_outfile,
            '--polish-target', median_read_unit_fn,
-           '-i', 4,
+           '-i', 2,
            '-t', 50,
            '-o', read_outdir]
     cmd = [str(x) for x in cmd]
