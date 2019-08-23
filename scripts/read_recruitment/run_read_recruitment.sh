@@ -8,6 +8,8 @@ INPUT=$1
 OUTPUT=$2
 THREADS=$3
 NREADS=$4
+UNIT=$5
+
 
 # TODO: update the "output" dir
 # scripts/read_recruitment/run_read_recruitment.sh <path2CHM13>/rel2.fastq.gz results/centromeric_reads_test_2 50 11100000
@@ -15,6 +17,13 @@ NREADS=$4
 
 # taken from https://stackoverflow.com/a/246128
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+if [ -z "$UNIT" ] ; then
+    UNIT="${SCRIPT_DIR}/../../supplementary_data/DXZ1_rc.fasta"
+else
+    UNIT="$(realpath $5)"
+    echo $UNIT
+fi
 
 mkdir -p $OUTPUT
 
@@ -25,6 +34,6 @@ zcat $INPUT | seqtk seq -A | awk -v x="$nreads_per_thread" -v y="$OUTPUT/split_f
 
 cd $OUTPUT/split_fa
 mkdir -p ../split_rr
-find . -name "*.fasta" | xargs -I {} -P $THREADS $SCRIPT_DIR/rr $SCRIPT_DIR/../../supplementary_data/DXZ1_rc.fasta {} ../split_rr/{}_cenX.fasta 350
+find . -name "*.fasta" | xargs -I {} -P $THREADS $SCRIPT_DIR/rr $UNIT {} ../split_rr/{}_cen.fasta 350
 cd ../split_rr
 cat *.fasta > ../centromeric_reads.fasta
