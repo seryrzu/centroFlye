@@ -2,6 +2,7 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+import argparse
 import regex as re
 from utils.bio import RC
 from collections import defaultdict, namedtuple
@@ -150,3 +151,20 @@ class NCRF_Report:
         for read_id, record in self.records.items():
             motifs_alignments[read_id] = record.get_motif_alignments(n=n)
         return motifs_alignments
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ncrf", help="NCRF report")
+    params = parser.parse_args()
+
+    ncrf_report = NCRF_Report(params.ncrf)
+    print(f"# records: {len(ncrf_report.records)}")
+    prefix_reads, internal_reads, suffix_reads = ncrf_report.classify()
+    print(f"# prefix reads {len(prefix_reads)}")
+    print(f"# internal reads {len(internal_reads)}")
+    print(f"# suffix reads {len(suffix_reads)}")
+
+
+if __name__ == "__main__":
+    main()
