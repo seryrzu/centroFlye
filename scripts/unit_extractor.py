@@ -1,5 +1,6 @@
 import argparse
 from collections import defaultdict
+import math
 import os
 import statistics
 import subprocess
@@ -36,6 +37,7 @@ def get_convolution(rep_kmers):
 
 
 def get_period_info(conv, bin_size):
+    # assert conv == sorted(conv)
     if len(conv) == 0:
         return [], [], None, None
     periods2bin_convs, bin_convs2periods = {}, {}
@@ -46,7 +48,16 @@ def get_period_info(conv, bin_size):
     while r < len(conv):
         while r < len(conv) and conv[r] - conv[l] <= 2 * bin_size:
             r += 1
-        period = int(statistics.median(conv[l:r]))
+
+        # period = statistics.median(conv[l:r])
+        mid = l + (r-l) // 2
+        if (r-l) % 2 == 0:
+            period = (conv[mid] + conv[mid-1]) // 2
+        else:
+            period = conv[mid]
+
+        # print(period, period_fast)
+        # assert period == period_fast
         curr_bin_conv = r - l
         if period not in periods2bin_convs or \
                 curr_bin_conv > periods2bin_convs[period]:
@@ -89,13 +100,19 @@ def split_by_hook(seq, hook):
 
 
 def run_on_read(seq, seq_id, k, bin_size, outdir):
+    print("Getting repetitive kmers")
     rep_kmers = get_repetitive_kmers(seq, k)
+    print("Getting union convolution")
     conv, union_conv = get_convolution(rep_kmers)
+    print("Getting periods")
     periods, bin_convs, bin_left, bin_right = \
         get_period_info(union_conv, bin_size=bin_size)
+    print(f"Selected period = {periods[0]}")
+    print("Getting hook")
     hook = get_hook_kmer(conv, bin_left, bin_right)
     if hook is None:
         return
+    print("Splitting by hook")
     splits = split_by_hook(seq, hook)
     med_len = \
         statistics.median_high([len(x) for x in splits.values()])
@@ -114,6 +131,7 @@ def run_on_read(seq, seq_id, k, bin_size, outdir):
     write_bio_seqs(median_read_unit_fn,
                    {template_read: median_read_unit})
 
+    print("Running Flye")
     cmd = ['flye',
            f'--nano-raw', splits_outfile,
            '--polish-target', median_read_unit_fn,
