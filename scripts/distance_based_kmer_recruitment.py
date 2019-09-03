@@ -105,10 +105,11 @@ def get_kmer_dist_map(reads_kmer_clouds, kmers,
 
     if verbose:
         print("Inferring distances")
-    dist_cnt = {}
+    dist_cnt = {dist: [defaultdict(int) for i in range(len(kmers))] \
+                for dist in range(min_d, max_d + 1)}
 
     for dist in range(min_d, max_d + 1):
-        dist_cnt[dist] = [defaultdict(int) for i in range(len(kmers))]
+        # dist_cnt[dist] = [defaultdict(int) for i in range(len(kmers))]
         dt = dist_cnt[dist]
         for n, (r_id, kmer_clouds) in \
                 enumerate(indexed_reads_kmer_clouds.items()):
