@@ -162,8 +162,12 @@ def main():
     print(f"# records: {len(ncrf_report.records)}")
     prefix_reads, internal_reads, suffix_reads = ncrf_report.classify()
     print(f"# prefix reads {len(prefix_reads)}")
+    for read in prefix_reads:
+        print(read[:8])
     print(f"# internal reads {len(internal_reads)}")
     print(f"# suffix reads {len(suffix_reads)}")
+    for read in suffix_reads:
+        print(read[:8])
 
 
 if __name__ == "__main__":
