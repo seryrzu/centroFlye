@@ -94,7 +94,9 @@ class ReadPlacer:
                 unused_reads.remove(best_read)
 
     def run(self):
-        left_PT_reads, FT_reads, right_PT_reads = self.ncrf_report.classify()
+        left_PT_reads, FT_reads, right_PT_reads = \
+            self.ncrf_report.classify(
+                large_threshold=self.params.prefix_threshold)
 
         print(f'Left: {len(left_PT_reads)}')
         print(f'FT: {len(FT_reads)}')
@@ -157,6 +159,10 @@ def main():
     parser.add_argument('--min-inters',
                         help='Score[1]',
                         default=10,
+                        type=int)
+    parser.add_argument('--prefix-threshold',
+                        help='Min pre/suffix length for read classification',
+                        default=50000,
                         type=int)
     parser.add_argument('--outdir',
                         help='Output directory',

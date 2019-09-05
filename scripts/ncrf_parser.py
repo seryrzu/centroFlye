@@ -116,7 +116,7 @@ class NCRF_Report:
             if r_id not in self.records:
                 self.discarded_reads.append(r_id)
 
-    def classify(self, large_threshold=50000, small_threshold=1000):
+    def classify(self, large_threshold, small_threshold=1000):
         prefix_reads, suffix_reads, internal_reads = [], [], []
         for r_id, record in self.records.items():
             r_len = self.read_lens[r_id]
