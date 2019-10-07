@@ -58,3 +58,86 @@ def gen_random_seq(length, bases=list("ACGT")):
 
 def compress_homopolymer(seq):
     return ''.join(x[0] for x in groupby(list(seq)))
+
+
+def hamming_distance(s1, s2, match_char=set()):
+    #assert len(s1) == len(s2)
+    nucl_ident = []
+    for x, y in zip(s1, s2):
+        if x in match_char or y in match_char:
+            nucl_ident.append(0)
+        else:
+            nucl_ident.append(x != y)
+    return sum(nucl_ident), len(nucl_ident)
+
+
+def identity_shift(s1, s2, min_overlap, match_char=set()):
+    best_identity, best_shift, best_hd, best_len = 0, None, None, None
+    alt_shifts = []
+    for shift in range(len(s1) - min_overlap):
+        hd, cur_length = \
+            hamming_distance(s1[shift:], s2, match_char=match_char)
+        identity = 1 - hd / cur_length
+        if identity == best_identity:
+            alt_shifts.append(shift)
+        if identity > best_identity:
+            best_identity = identity
+            best_shift = shift
+            best_hd = hd
+            best_len = cur_length
+            alt_shifts = []
+    return {'id': best_identity, 'shift': best_shift,
+            'hd': best_hd, 'len': best_len,
+            'alt_shifts': alt_shifts}
+
+
+def OverlapAlignment(s1, s2, mismatch, sigma):
+    n, m = len(s1) + 1, len(s2) + 1
+    s1 = ' ' + s1
+    s2 = ' ' + s2
+
+    def cell(prev, char, score):
+        return {'prev': prev, 'char': char, 'score': score}
+
+    w = [[0] * m for i in range(n)]
+    # for i in range(1, n):
+    #     w[i][0] = w[i-1][0] - sigma
+    for j in range(1, m):
+        w[0][j] = w[0][j-1] - sigma
+
+    for i in range(1, n):
+        for j in range(1, m):
+            a = w[i-1][j-1] + (1 if s1[i] == s2[j] else -mismatch)
+            b, c = w[i-1][j] - sigma, w[i][j-1] - sigma
+            w[i][j] = max(a, b, c)
+
+    lrow_max = max(w[-1])
+    jmax = [j for j in range(1, m) if w[-1][j] == lrow_max][0]
+    a1, a2 = [], []
+    i, j = n-1, jmax
+    while i != 0 and j != 0:
+        if w[i][j] == w[i-1][j-1] + (1 if s1[i] == s2[j] else -mismatch):
+            a1.append(s1[i])
+            a2.append(s2[j])
+            i, j = i-1, j-1
+        elif w[i][j] == w[i-1][j] - sigma:
+            a1.append(s1[i])
+            a2.append('-')
+            i, j = i-1, j
+        elif w[i][j] == w[i][j-1] - sigma:
+            a1.append('-')
+            a2.append(s2[j])
+            i, j = i, j-1
+
+    a1 = ''.join(a1[::-1])
+    a2 = ''.join(a2[::-1])
+
+    a1 = s1[1:(i+1)] + '|' + a1
+    a2 = '-' * i + '|' + a2
+    
+    a1 += '|' + '-' * (m-jmax-1)
+    a2 += '|' + s2[jmax+1:]
+    
+    assert len(a1) == len(a2)
+
+    return w[n-1][jmax], a1, a2, i
