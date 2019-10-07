@@ -9,6 +9,7 @@ OUTPUT=$2
 THREADS=$3
 NREADS=$4
 UNIT=$5
+THRESHOLD=$6
 
 
 # TODO: update the "output" dir
@@ -25,6 +26,10 @@ else
     echo $UNIT
 fi
 
+if [ -z "$THRESHOLD" ] ; then
+    THRESHOLD=350
+fi
+
 mkdir -p $OUTPUT
 
 nreads_per_thread="$((NREADS / THREADS * 2))"
@@ -34,6 +39,6 @@ zcat $INPUT | seqtk seq -A | awk -v x="$nreads_per_thread" -v y="$OUTPUT/split_f
 
 cd $OUTPUT/split_fa
 mkdir -p ../split_rr
-find . -name "*.fasta" | xargs -I {} -P $THREADS $SCRIPT_DIR/rr $UNIT {} ../split_rr/{}_cen.fasta 350
+find . -name "*.fasta" | xargs -I {} -P $THREADS $SCRIPT_DIR/rr $UNIT {} ../split_rr/{}_cen.fasta $THRESHOLD
 cd ../split_rr
 cat *.fasta > ../centromeric_reads.fasta
