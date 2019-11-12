@@ -5,6 +5,7 @@
 from Bio import SeqIO
 import numpy as np
 from itertools import groupby
+import re
 
 
 def read_bio_seq(filename):
@@ -134,10 +135,54 @@ def OverlapAlignment(s1, s2, mismatch, sigma):
 
     a1 = s1[1:(i+1)] + '|' + a1
     a2 = '-' * i + '|' + a2
-    
+
     a1 += '|' + '-' * (m-jmax-1)
     a2 += '|' + s2[jmax+1:]
-    
+
     assert len(a1) == len(a2)
 
     return w[n-1][jmax], a1, a2, i
+
+
+def parse_cigar(cigar, s1=None, s2=None):
+    parsed_cigar = []
+    st = 0
+    cnt = dict.fromkeys(list("=XID"), 0)
+    for mo in re.finditer(r'=|X|I|D', cigar):
+        group = mo.group()
+        pos = mo.start()
+        region_len = int(cigar[st:pos])
+        parsed_cigar.append((region_len, group))
+        cnt[group] += region_len
+        st = pos + 1
+    if s1 is None or s2 is None:
+        return parsed_cigar, cnt
+
+    a1, a2 = [], []
+    i1, i2 = 0, 0
+    for region_len, group in parsed_cigar:
+        if group in '=X':
+            new_s1 = s1[i1:i1+region_len]
+            new_s2 = s2[i2:i2+region_len]
+            if group == '=':
+                assert new_s1 == new_s2
+            a1 += new_s1
+            a2 += new_s2
+            i1 += region_len
+            i2 += region_len
+        elif group == 'D':
+            a1 += '-' * region_len
+            a2 += s2[i2:i2+region_len]
+            i2 += region_len
+        elif group == 'I':
+            a2 += '-' * region_len
+            a1 += s1[i1:i1+region_len]
+            i1 += region_len
+
+    a1 = ''.join(a1)
+    a2 = ''.join(a2)
+    return parsed_cigar, cnt, a1, a2
+
+
+assert parse_cigar('89=1X6=3X76=') == ([(89, '='), (1, 'X'), (6, '='), (3, 'X'), (76, '=')],
+                                       {'=': 171, 'X': 4, 'I': 0, 'D': 0})
