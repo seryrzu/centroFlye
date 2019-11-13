@@ -1,4 +1,7 @@
+from collections import defaultdict
+
 import networkx as nx
+import numpy as np
 
 
 class DeBruijnGraph:
@@ -28,9 +31,9 @@ class DeBruijnGraph:
 
         self.graph.add_edge(prefix_node_ind, suffix_node_ind,
                             edge_kmer=kmer,
-                            length=self.k,
+                            length=1,
                             coverages=[coverage],
-                            label=f'len={self.k}\ncov={coverage}',
+                            label=f'len=1\ncov={coverage}',
                             color='black' if coverage < self.max_uniq_cov else 'red')
 
     def add_kmers(self, kmers, coverage=None):
@@ -79,14 +82,14 @@ class DeBruijnGraph:
                     out_edge_kmer[-(len(out_edge_kmer)-self.k+1):]
                 new_coverages = in_edge_cov + out_edge_cov
                 new_coverages.sort()
-                new_edge_len = self.k+len(new_coverages)-1
-                new_edge_mean_cov = np.mean(new_coverages)
+                new_edge_len = len(new_coverages)
+                new_edge_med_cov = np.median(new_coverages)
                 self.graph.add_edge(in_node, out_node,
                                     edge_kmer=new_kmer,
                                     coverages=new_coverages,
                                     length=new_edge_len,
-                                    label=f'len={new_edge_len}\ncov={new_edge_mean_cov}',
-                                    color='black' if new_edge_mean_cov < self.max_uniq_cov else 'red')
+                                    label=f'len={new_edge_len}\ncov={new_edge_med_cov}',
+                                    color='black' if new_edge_med_cov < self.max_uniq_cov else 'red')
                 self.graph.remove_node(node)
 
     def get_edges(self):
@@ -198,3 +201,53 @@ class DeBruijnGraph:
             contigs.append(self.get_path(path))
         contigs = list(set(contigs))
         return contigs, selected_paths
+    
+
+def iterative_graph(monomer_strings, min_k, max_k, outdir, min_mult=5, step=1, starting_graph=None):
+    smart_makedirs(outdir)
+    
+    dbs, all_contigs = {}, {}
+    input_strings = monomer_strings.copy()
+    
+    if starting_graph is not None:
+        contigs, contig_paths = starting_graph.get_contigs()
+        for i in range(len(contigs)):
+            for j in range(min_mult):
+                input_strings[f'contig_k{min_k}_i{i}_j{j}'] = contigs[i]
+
+    for k in range(min_k, max_k+1, step):
+        print(f'\nk={k}')
+        # print(len(input_strings))
+        frequent_kmers, frequent_kmers_read_pos = get_frequent_kmers(input_strings, k=k, min_mult=min_mult)
+        print(f'#frequent kmers = {len(frequent_kmers)}')
+        db = DeBruijnGraph(k=k)
+        db.add_kmers(frequent_kmers, coverage=frequent_kmers)
+
+        # lens = sorted((len(contig), coverage) for contig, coverage in zip(contigs, coverages))[::-1]
+        # long_edges = [x for x in lens if x[1] >= 50]
+        
+        db.collapse_nonbranching_paths()
+        if nx.number_weakly_connected_components(db.graph) > 1:
+            print(f'#cc = {nx.number_weakly_connected_components(db.graph)}')
+            for cc in nx.weakly_connected_components(db.graph):
+                print(len(cc))
+            # break
+        dbs[k] = db
+        
+        dot_file = os.path.join(outdir, f'db_k{k}.dot')
+        pdf_file = os.path.join(outdir, f'db_k{k}.pdf')
+        nx.drawing.nx_pydot.write_dot(db.graph, dot_file)
+        !dot -Tpdf {dot_file} -o {pdf_file}
+        
+        
+        contigs, contig_paths = db.get_contigs()
+        all_contigs[k] = contigs
+
+        input_strings = monomer_strings.copy()
+        # print(len(input_strings))
+        for i in range(len(contigs)):
+            for j in range(min_mult):
+                input_strings[f'contig_k{k}_i{i}_j{j}'] = contigs[i]
+        # print(len(input_strings))
+    
+    return all_contigs, dbs
