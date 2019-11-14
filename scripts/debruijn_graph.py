@@ -1,7 +1,10 @@
-from collections import defaultdict
+from collections import defaultdict, Counter
+import os
 
 import networkx as nx
 import numpy as np
+
+from utils.os_utils import smart_makedirs
 
 
 class DeBruijnGraph:
@@ -201,31 +204,79 @@ class DeBruijnGraph:
             contigs.append(self.get_path(path))
         contigs = list(set(contigs))
         return contigs, selected_paths
-    
 
-def iterative_graph(monomer_strings, min_k, max_k, outdir, min_mult=5, step=1, starting_graph=None):
+
+def get_all_kmers(strings, k):
+    all_kmers = Counter()
+    read_kmer_locations = defaultdict(list)
+    for r_id, string in strings.items():
+        for i in range(len(string)-k+1):
+            kmer = string[i:i+k]
+            if '=' not in kmer:
+                all_kmers[kmer] += 1
+                read_kmer_locations[kmer].append((r_id, i))
+    return all_kmers, read_kmer_locations
+
+
+def get_complex_nodes(graph):
+    complex_nodes = []
+    for node in graph.nodes():
+        indegree, outdegree = graph.in_degree(node), graph.out_degree(node)
+        if indegree > 1 and outdegree > 1:
+            complex_nodes.append(node)
+    return complex_nodes
+
+
+def get_paths_thru_complex_nodes(db, strings, min_mult=2):
+    complex_nodes = get_complex_nodes(db.graph)
+    k = db.k
+    all_kp1mers, _ = get_all_kmers(strings, k=k+1)
+    selected_kp1mers = {}
+    for node in complex_nodes:
+        for in_edge in db.graph.in_edges(node, keys=True, data=True):
+            for out_edge in db.graph.out_edges(node, keys=True, data=True):
+                in_kmer = in_edge[3]['edge_kmer'][-k:]
+                out_kmer = out_edge[3]['edge_kmer'][:k]
+                assert in_kmer[1:] == out_kmer[:-1]
+                kp1 = in_kmer + out_kmer[-1]
+                if all_kp1mers[kp1] >= min_mult:
+                    selected_kp1mers[kp1] = all_kp1mers[kp1]
+    return selected_kp1mers
+
+
+def get_frequent_kmers(strings, k, min_mult=5):
+    all_kmers, read_kmer_locations = get_all_kmers(strings, k)       
+    frequent_kmers = {kmer: cnt for kmer, cnt in all_kmers.items()
+                      if cnt >= min_mult}
+    frequent_kmers_read_pos = {kmer: read_kmer_locations[kmer] for kmer in frequent_kmers}
+    return frequent_kmers, frequent_kmers_read_pos
+
+
+def iterative_graph(strings, min_k, max_k, outdir, min_mult=5, step=1, starting_graph=None):
     smart_makedirs(outdir)
     
     dbs, all_contigs = {}, {}
-    input_strings = monomer_strings.copy()
+    input_strings = strings.copy()
+    complex_kp1mers = {}
     
     if starting_graph is not None:
         contigs, contig_paths = starting_graph.get_contigs()
         for i in range(len(contigs)):
             for j in range(min_mult):
                 input_strings[f'contig_k{min_k}_i{i}_j{j}'] = contigs[i]
+        
+        complex_kp1mers = get_paths_thru_complex_nodes(starting_graph, strings)
+
 
     for k in range(min_k, max_k+1, step):
         print(f'\nk={k}')
-        # print(len(input_strings))
         frequent_kmers, frequent_kmers_read_pos = get_frequent_kmers(input_strings, k=k, min_mult=min_mult)
+        frequent_kmers.update(complex_kp1mers)
         print(f'#frequent kmers = {len(frequent_kmers)}')
+        
         db = DeBruijnGraph(k=k)
         db.add_kmers(frequent_kmers, coverage=frequent_kmers)
 
-        # lens = sorted((len(contig), coverage) for contig, coverage in zip(contigs, coverages))[::-1]
-        # long_edges = [x for x in lens if x[1] >= 50]
-        
         db.collapse_nonbranching_paths()
         if nx.number_weakly_connected_components(db.graph) > 1:
             print(f'#cc = {nx.number_weakly_connected_components(db.graph)}')
@@ -235,19 +286,19 @@ def iterative_graph(monomer_strings, min_k, max_k, outdir, min_mult=5, step=1, s
         dbs[k] = db
         
         dot_file = os.path.join(outdir, f'db_k{k}.dot')
-        pdf_file = os.path.join(outdir, f'db_k{k}.pdf')
+        # pdf_file = os.path.join(outdir, f'db_k{k}.pdf')
         nx.drawing.nx_pydot.write_dot(db.graph, dot_file)
-        !dot -Tpdf {dot_file} -o {pdf_file}
+        # os.system(f"dot -Tpdf {dot_file} -o {pdf_file}")
         
         
         contigs, contig_paths = db.get_contigs()
         all_contigs[k] = contigs
 
-        input_strings = monomer_strings.copy()
-        # print(len(input_strings))
+        input_strings = strings.copy()
         for i in range(len(contigs)):
             for j in range(min_mult):
                 input_strings[f'contig_k{k}_i{i}_j{j}'] = contigs[i]
-        # print(len(input_strings))
-    
+        
+        complex_kp1mers = get_paths_thru_complex_nodes(db, strings)
+
     return all_contigs, dbs
