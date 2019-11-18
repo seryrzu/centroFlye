@@ -256,6 +256,7 @@ def iterative_graph(strings, min_k, max_k, outdir, min_mult=5, step=1, starting_
     smart_makedirs(outdir)
     
     dbs, all_contigs = {}, {}
+    all_frequent_kmers, all_frequent_kmers_read_pos = {}, {}
     input_strings = strings.copy()
     complex_kp1mers = {}
     
@@ -273,6 +274,8 @@ def iterative_graph(strings, min_k, max_k, outdir, min_mult=5, step=1, starting_
         frequent_kmers, frequent_kmers_read_pos = get_frequent_kmers(input_strings, k=k, min_mult=min_mult)
         frequent_kmers.update(complex_kp1mers)
         print(f'#frequent kmers = {len(frequent_kmers)}')
+        all_frequent_kmers[k] = frequent_kmers
+        all_frequent_kmers_read_pos[k] = frequent_kmers_read_pos
         
         db = DeBruijnGraph(k=k)
         db.add_kmers(frequent_kmers, coverage=frequent_kmers)
@@ -301,4 +304,4 @@ def iterative_graph(strings, min_k, max_k, outdir, min_mult=5, step=1, starting_
         
         complex_kp1mers = get_paths_thru_complex_nodes(db, strings)
 
-    return all_contigs, dbs
+    return all_contigs, dbs, all_frequent_kmers, all_frequent_kmers_read_pos
