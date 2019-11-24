@@ -21,7 +21,7 @@ class SD_Report:
             self.alt_call = pandas_df.alt_call.to_list()
 
             self.string = \
-                [self.monomers[0][0] if self.alt_call[0] == 'None'
+                [self.monomers[0][0] if self.alt_call[0] == '+'
                  else gap_symb]
             self.gaps = []
             for tr1, tr2, rel2 in \
@@ -33,7 +33,7 @@ class SD_Report:
                     self.gaps.append((tr1[2], tr2[1]))
                     self.string.append(gap_symb *
                                        int(round(gap_len / mean_monomer_len)))
-                if rel2 == 'None':
+                if rel2 == '+':
                     self.string.append(tr2[0])
                 else:
                     self.string.append(gap_symb)
@@ -69,8 +69,7 @@ class SD_Report:
                          names=['r_id', 'monomer',
                                 'r_st', 'r_en',
                                 'score',
-                                'alt_call',
-                                'alt_score'
+                                'alt_call'
                                 ])
         df.monomer = df.monomer.apply(lambda x: self.monomer_names_map[x])
         df = df.groupby('r_id')
