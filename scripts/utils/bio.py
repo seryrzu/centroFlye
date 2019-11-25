@@ -62,7 +62,7 @@ def compress_homopolymer(seq):
 
 
 def hamming_distance(s1, s2, match_char=set()):
-    #assert len(s1) == len(s2)
+    # assert len(s1) == len(s2)
     nucl_ident = []
     for x, y in zip(s1, s2):
         if x in match_char or y in match_char:
@@ -186,3 +186,9 @@ def parse_cigar(cigar, s1=None, s2=None):
 
 assert parse_cigar('89=1X6=3X76=') == ([(89, '='), (1, 'X'), (6, '='), (3, 'X'), (76, '=')],
                                        {'=': 171, 'X': 4, 'I': 0, 'D': 0})
+
+
+def min_cyclic_shift(s):
+    ds = s + s
+    min_shift = min(ds[i:i+len(s)] for i in range(len(s)))
+    return min_shift

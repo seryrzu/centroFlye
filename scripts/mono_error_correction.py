@@ -2,7 +2,7 @@ from collections import Counter
 
 import numpy as np
 
-from utils.bio import hamming_distance
+from utils.bio import hamming_distance, min_cyclic_shift
 from debruijn_graph import DeBruijnGraph, get_frequent_kmers
 from sd_parser import get_stats
 
@@ -71,7 +71,7 @@ def cut_gaprich_reads(monoreads, max_gap=0.05, min_len=100, gap_symb='?'):
 
 
 def correct_gaps(monomer_strings, max_gap=0.3, nhor=1,
-                 k=3, min_mult=1000,
+                 k=3, min_mult=5000,
                  gap_symb='?'):
     frequent_kmers, frequent_kmers_read_pos = \
         get_frequent_kmers(monomer_strings, k=k, min_mult=min_mult)
@@ -79,6 +79,7 @@ def correct_gaps(monomer_strings, max_gap=0.3, nhor=1,
     db.add_kmers(frequent_kmers, coverage=frequent_kmers)
 
     hors, _ = db.get_contigs()
+    hors = [min_cyclic_shift(hor) for hor in hors]
     corrected_strings = {}
     for r_id, monomer_string in monomer_strings.items():
         corrected_string = list(monomer_string)

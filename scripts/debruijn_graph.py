@@ -9,12 +9,13 @@ from utils.os_utils import smart_makedirs
 
 
 class DeBruijnGraph:
-    def __init__(self, k, max_uniq_cov=30):
+    def __init__(self, k, max_uniq_cov=30, min_uniq_len=10):
         self.graph = nx.MultiDiGraph()
         self.k = k
         self.node_mapping = {}
         self.rev_node_mapping = {}
         self.max_uniq_cov = max_uniq_cov
+        self.min_uniq_len = min_uniq_len
 
     def add_kmer(self, kmer, coverage=1):
         prefix, suffix = kmer[:-1], kmer[1:]
@@ -40,7 +41,7 @@ class DeBruijnGraph:
             length=1,
             coverages=[coverage],
             label=f'len=1\ncov={coverage}',
-            color='black' if coverage < self.max_uniq_cov else 'red')
+            color='black')
 
     def add_kmers(self, kmers, coverage=None):
         for kmer in kmers:
@@ -91,12 +92,16 @@ class DeBruijnGraph:
                 new_coverages.sort()
                 new_edge_len = len(new_coverages)
                 new_edge_med_cov = np.median(new_coverages)
+                if new_edge_len >= self.min_uniq_len and \
+                        new_edge_med_cov <= self.max_uniq_cov:
+                    new_edge_color = 'blue'
+                else:
+                    new_edge_color = 'black'
                 self.graph.add_edge(
                     in_node, out_node, edge_kmer=new_kmer,
                     coverages=new_coverages, length=new_edge_len,
                     label=f'len={new_edge_len}\ncov={new_edge_med_cov}',
-                    color='black'
-                    if new_edge_med_cov < self.max_uniq_cov else 'red')
+                    color=new_edge_color)
                 self.graph.remove_node(node)
 
     def get_edges(self):
