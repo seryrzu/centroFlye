@@ -9,7 +9,7 @@ from utils.os_utils import smart_makedirs
 
 
 class DeBruijnGraph:
-    def __init__(self, k, max_uniq_cov=30, min_uniq_len=10):
+    def __init__(self, k, max_uniq_cov=30, min_uniq_len=1000):
         self.graph = nx.MultiDiGraph()
         self.k = k
         self.node_mapping = {}
@@ -92,7 +92,7 @@ class DeBruijnGraph:
                 new_coverages.sort()
                 new_edge_len = len(new_coverages)
                 new_edge_med_cov = np.median(new_coverages)
-                if new_edge_len >= self.min_uniq_len and \
+                if new_edge_len + self.k - 1 >= self.min_uniq_len and \
                         new_edge_med_cov <= self.max_uniq_cov:
                     new_edge_color = 'blue'
                 else:
