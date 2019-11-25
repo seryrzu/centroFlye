@@ -9,7 +9,7 @@ from utils.os_utils import smart_makedirs
 
 
 class DeBruijnGraph:
-    def __init__(self, k, max_uniq_cov=30, min_uniq_len=1000):
+    def __init__(self, k, max_uniq_cov=60, min_uniq_len=1000):
         self.graph = nx.MultiDiGraph()
         self.k = k
         self.node_mapping = {}
@@ -88,8 +88,7 @@ class DeBruijnGraph:
 
                 new_kmer = in_edge_kmer + \
                     out_edge_kmer[-(len(out_edge_kmer)-self.k+1):]
-                new_coverages = in_edge_cov + out_edge_cov
-                new_coverages.sort()
+                new_coverages = sorted(in_edge_cov + out_edge_cov)
                 new_edge_len = len(new_coverages)
                 new_edge_med_cov = np.median(new_coverages)
                 if new_edge_len + self.k - 1 >= self.min_uniq_len and \
@@ -200,19 +199,16 @@ class DeBruijnGraph:
         contigs = list(set(contigs))
         return contigs, valid_paths
 
-    def map_reads(self, monomer_strings, verbose=True):
-        print("Indexing started")
+    def map_reads(self, monomer_strings, gap_symb='?', verbose=True):
         self.index_edges()
-        print("Indexing completed")
         mapping = {}
         db_edges = list(self.graph.edges(keys=True))
         for i, (r_id, string) in enumerate(monomer_strings.items()):
             if verbose:
                 print(i+1, len(monomer_strings))
 
-            split_strings = list(filter(lambda string: len(string), string.split('=')))
-            split_lens = [0] + [len(split_string) for split_string in split_strings]
-            cum_split_lens = np.cumsum(split_lens)
+            split_strings = list(filter(lambda string: len(string),
+                                        string.split(gap_symb)))
             read_coords = []
             for split_ind, split_string in enumerate(split_strings):
                 for i in range(len(split_string)-self.k+1):
@@ -230,10 +226,19 @@ class DeBruijnGraph:
                     valid_path = False
                     break
             if len(read_coords):
-                mapping[r_id] = (read_coords[0], read_coords[-1], valid_path, path)
+                mapping[r_id] = (read_coords[0], read_coords[-1],
+                                 valid_path, path)
             else:
                 mapping[r_id] = None
         return mapping
+
+    def get_long_edges(self):
+        edges = {}
+        for edge in self.graph.edges(data=True, keys=True):
+            edge_color = edge[-1]['color']
+            if edge_color == 'blue':
+                edges[edge[:-1]] = edge[-1]['edge_kmer']
+        return edges
 
 
 def get_all_kmers(strings, k, gap_symb='?'):
@@ -336,3 +341,109 @@ def iterative_graph(strings, min_k, max_k, outdir,
         complex_kp1mers = get_paths_thru_complex_nodes(db, strings)
 
     return all_contigs, dbs, all_frequent_kmers, all_frequent_kmers_read_pos
+
+
+def scaffolding(db, mappings, min_connections=3):
+    def find_connections():
+        long_edges = db.get_long_edges()
+        long_edges_ids = set(long_edges.keys())
+        connections = defaultdict(lambda: defaultdict(int))
+        for r_id, mapping in mappings.items():
+            if mapping is None:
+                continue
+            _, _, valid_path, path = mapping
+            if valid_path:
+                mapped_edges = set(path)
+                inters = mapped_edges & long_edges_ids
+                if len(inters) > 1:
+                    indexes = []
+                    for long_edge in inters:
+                        index = path.index(long_edge)
+                        indexes.append(index)
+                    indexes.sort()
+                    for i, j in zip(indexes[:-1], indexes[1:]):
+                        long_edge_pair = (path[i], path[j])
+                        connection = tuple(path[i:j+1])
+                        connections[long_edge_pair][connection] += 1
+        return connections
+
+    def build_scaffold_graph(connections):
+        scaffold_graph = nx.DiGraph()
+        for (e1, e2), connection_counts in connections.items():
+            n_support_connections = sum(connection_counts.values())
+            if n_support_connections > min_connections:
+                scaffold_graph.add_edge(e1, e2,
+                                        connections=connection_counts)
+        return scaffold_graph
+
+    def select_lists(scaffold_graph):
+        longedge_scaffolds = []
+        for cc in nx.weakly_connected_components(scaffold_graph):
+            cc_sg = scaffold_graph.subgraph(cc)
+            if nx.is_directed_acyclic_graph(cc_sg):
+                top_sort = list(nx.topological_sort(cc_sg))
+                is_list = True
+                for e1, e2 in zip(top_sort[:-1], top_sort[1:]):
+                    if (e1, e2) not in cc_sg.edges():
+                        is_list = False
+                        break
+                if is_list:
+                    longedge_scaffolds.append(top_sort)
+        return longedge_scaffolds
+
+    def get_longest_extensions(longedge_scaffold):
+        left_edge = longedge_scaffold[0]
+        right_edge = longedge_scaffold[-1]
+        lst_left_ext = []
+        lst_right_ext = []
+        for r_id, mapping in mappings.items():
+            if mapping is None:
+                continue
+            _, _, valid_path, path = mapping
+            if not valid_path:
+                continue
+            try:
+                left_index = path.index(left_edge)
+                left_ext = path[:left_index]
+                if len(left_ext) > len(lst_left_ext):
+                    lst_left_ext = left_ext
+            except ValueError:
+                pass
+            try:
+                right_index = path.index(right_edge)
+                right_ext = path[right_index+1:]
+                if len(right_ext) > len(lst_right_ext):
+                    lst_right_ext = right_ext
+            except ValueError:
+                pass
+        return lst_left_ext, lst_right_ext
+
+    def get_edge_scaffolds(longedge_scaffolds, connections):
+        edge_scaffolds = []
+        for longedge_scaffold in longedge_scaffolds:
+            edge_scaffold = [longedge_scaffold[0]]
+            for e1, e2 in zip(longedge_scaffold[:-1],
+                              longedge_scaffold[1:]):
+                # print(e1, e2)
+                edge_connect = connections[(e1, e2)]
+                path = max(edge_connect, key=edge_connect.get)
+                edge_scaffold += path[1:]
+            left_ext, right_ext = get_longest_extensions(longedge_scaffold)
+            edge_scaffold = left_ext + edge_scaffold + right_ext
+            edge_scaffolds.append(edge_scaffold)
+        return edge_scaffolds
+
+    def get_sequence_scaffolds(edge_scaffolds):
+        scaffolds = []
+        for edge_scaffold in edge_scaffolds:
+            scaffold = db.get_path(edge_scaffold)
+            scaffolds.append(scaffold)
+        return scaffolds
+
+    connections = find_connections()
+    scaffold_graph = build_scaffold_graph(connections)
+    longedge_scaffolds = select_lists(scaffold_graph)
+    edge_scaffolds = get_edge_scaffolds(longedge_scaffolds,
+                                        connections)
+    scaffolds = get_sequence_scaffolds(edge_scaffolds)
+    return scaffolds
