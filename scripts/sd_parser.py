@@ -89,6 +89,7 @@ class SD_Report:
 def get_ngap_symbols(monostrings, compr_hmp=False, gap_symb='?'):
     cnt = 0
     for monostring in monostrings.values():
+        monostring = monostring.tostring()
         if compr_hmp:
             monostring = compress_homopolymer(monostring)
         cnt += Counter(monostring)[gap_symb]

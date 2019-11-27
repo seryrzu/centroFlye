@@ -1,10 +1,11 @@
 from collections import Counter
+from copy import deepcopy
 
 import numpy as np
 
 from utils.bio import hamming_distance, min_cyclic_shift
 from debruijn_graph import DeBruijnGraph, get_frequent_kmers
-from sd_parser import get_stats
+from sd_parser_83640e3 import get_stats
 
 
 def get_ma(x, N):
@@ -22,6 +23,7 @@ def filter_lowercaserich_reads(monoreads, max_lowercase=0.1):
 
 
 def trim_read(monoread, max_gap, ma_window, gap_symb='?'):
+    monoread = deepcopy(monoread)
     is_gap = [c == gap_symb for c in monoread]
     ma = get_ma(is_gap, N=ma_window)
     left = 0
@@ -30,10 +32,11 @@ def trim_read(monoread, max_gap, ma_window, gap_symb='?'):
     right = len(ma) - 1
     while right >= 0 and ma[right] > max_gap:
         right -= 1
-    trimmed_read = monoread[left:right+1+ma_window]
+    monoread.trim_read(left, right+ma_window+1)
+    monoread.strip()
     trimmed_read = trimmed_read.strip(gap_symb)
     trimmed_length = left + len(ma)-(right+1+ma_window)
-    return trimmed_read, trimmed_length
+    return monoread, trimmed_length
 
 
 def trim_reads(monoreads, max_gap=0.2, ma_window=30):
@@ -101,24 +104,27 @@ def correct_gaps(monomer_strings, max_gap=0.3, nhor=1,
     return corrected_strings
 
 
-def error_correction(monoreads, verbose=False):
+def error_correction(monoreads, verbose=False, hor_correction=True):
     filtered_reads = filter_lowercaserich_reads(monoreads)
-    trimmed_monoreads = trim_reads(filtered_reads)
-    cut_monoreads, cut_cnt, total_parts_cnt = \
-        cut_gaprich_reads(trimmed_monoreads)
-    hor_corrected = correct_gaps(cut_monoreads)
-
+    # trimmed_monoreads = trim_reads(filtered_reads)
+    # cut_monoreads, cut_cnt, total_parts_cnt = \
+    #     cut_gaprich_reads(trimmed_monoreads)
+    # corrected_reads = cut_monoreads
+    # if hor_correction:
+    #     hor_corrected = correct_gaps(cut_monoreads)
+    #     corrected_reads = hor_corrected
     if verbose:
         print('Stats for uncorrected reads')
         get_stats(monoreads, verbose=True, return_stats=False)
         print('\nStats for filtered reads')
         get_stats(filtered_reads, verbose=True, return_stats=False)
-        print('\nStats for trimmed+filtered reads')
-        get_stats(trimmed_monoreads, verbose=True, return_stats=False)
-        print('\nStats for cut_gaprich_reads+trimmed+filtered reads')
-        print(f'# cut reads = {cut_cnt}')
-        print(f'# total cut parts = {total_parts_cnt}')
-        get_stats(cut_monoreads, verbose=True, return_stats=False)
-        print('\nStats for hor_corrected+cut_gaprich_reads+trimmed+filtered reads')
-        get_stats(hor_corrected, verbose=True, return_stats=False)
-    return hor_corrected
+    #     print('\nStats for trimmed+filtered reads')
+    #     get_stats(trimmed_monoreads, verbose=True, return_stats=False)
+    #     print('\nStats for cut_gaprich_reads+trimmed+filtered reads')
+    #     print(f'# cut reads = {cut_cnt}')
+    #     print(f'# total cut parts = {total_parts_cnt}')
+    #     get_stats(cut_monoreads, verbose=True, return_stats=False)
+    #     if hor_correction:
+    #         print('\nStats for hor_corrected+cut_gaprich_reads+trimmed+filtered reads')
+    #         get_stats(hor_corrected, verbose=True, return_stats=False)
+    # return corrected_reads

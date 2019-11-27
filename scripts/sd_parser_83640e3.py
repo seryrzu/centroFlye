@@ -8,6 +8,69 @@ import pandas as pd
 from utils.bio import read_bio_seqs, compress_homopolymer
 
 
+class MonoString:
+    def __init__(self, gap_symb):
+        self.string = []
+        self.mono2nucl = {}
+        self.gap_symb = gap_symb
+        self.trimmed_len = 0
+        self.strand = '+'
+
+    def add_gap(self, length):
+        self.string += [self.gap_symb] * length
+
+    def add_monomer(self, monomer, st, en):
+        self.mono2nucl[len(self.string)] = (monomer, st, en)
+        self.string.append(monomer)
+
+    def assert_validity(self):
+        for coord, (c, _, _) in self.mono2nucl.items():
+            # print(coord, c, self.string[coord])
+            assert c == self.string[coord]
+
+    def check_reverse(self):
+        perc_lower_case = np.mean([c.islower() for c in self.string
+                                   if c.lower() != c.upper()])
+        if perc_lower_case > 0.5:
+            self.string = self.string[::-1]
+            self.string = [m.swapcase() for m in self.string]
+            self.strand = '-'
+            rev_mono2nucl = {}
+            for coord, (monomer, st, en) in self.mono2nucl.items():
+                rev_coord = len(self.string) - coord - 1
+                rev_mono2nucl[rev_coord] = (monomer.swapcase(), en, st)
+            self.mono2nucl = rev_mono2nucl
+        self.assert_validity()
+
+    def trim_read(self, left, right):
+        self.string = self.string[left:right]
+        self.mono2nucl = \
+            {k - left: v for k, v in self.mono2nucl.items()
+             if left <= k < right}
+        self.assert_validity()
+
+    def strip(self):
+        i, j = 0, len(self.string) - 1
+        while i < len(self.string) and self.string[i] == self.gap_symb:
+            i += 1
+        while j >= 0 and self.string[j] == self.gap_symb:
+            j -= 1
+        self.trim_read(i, j+1)
+
+    def tostring(self):
+        return ''.join(self.string)
+
+    def __len__(self):
+        return self.string.__len__()
+
+    def __getitem__(self, sub):
+        if isinstance(sub, slice):
+            sublist = self.string[sub.start:sub.stop:sub.step]
+            sublist = ''.join(sublist)
+            return sublist
+        return self.string[sub]
+
+
 class SD_Report:
     class SD_Record:
         def __init__(self, r_id, pandas_df,
@@ -20,36 +83,30 @@ class SD_Report:
             self.score = pandas_df.score.to_list()
             self.alt_call = pandas_df.alt_call.to_list()
 
-            self.string = \
-                [self.monomers[0][0] if self.alt_call[0] == '+'
-                 else gap_symb]
+            self.string = MonoString(gap_symb=gap_symb)
+
+            if self.alt_call[0] == '+':
+                monomer, st, en = self.triples[0]
+                self.string.add_monomer(monomer=monomer, st=st, en=en)
+            else:
+                self.string.add_gap(1)
+
             self.gaps = []
-            for tr1, tr2, rel2 in \
-                    zip(self.triples[:-1],
-                        self.triples[1:],
-                        self.alt_call[1:]):
+            for tr1, tr2, rel2 in zip(self.triples[:-1],
+                                      self.triples[1:],
+                                      self.alt_call[1:]):
                 gap_len = tr2[1] - tr1[2]
                 if gap_len > max_gap:
                     self.gaps.append((tr1[2], tr2[1]))
-                    self.string.append(gap_symb *
-                                       int(round(gap_len / mean_monomer_len)))
+                    int_gap_len = int(round(gap_len / mean_monomer_len))
+                    self.string.add_gap(int_gap_len)
                 if rel2 == '+':
-                    self.string.append(tr2[0])
+                    self.string.add_monomer(*tr2)
                 else:
-                    self.string.append(gap_symb)
+                    self.string.add_gap(1)
 
-            self.string = ''.join(self.string)
-            perc_lower_case = np.mean([c.islower() for c in self.string
-                                       if c.lower() != c.upper()])
-            if perc_lower_case > 0.5:
-                self.string = self.string[::-1].swapcase()
-                self.strand = '-'
-            else:
-                self.strand = '+'
-
-            self.string = self.string.strip(gap_symb)
-            self.split_strings = self.string.split(gap_symb)
-            self.split_strings = [s for s in self.split_strings if len(s)]
+            self.string.strip()
+            self.string.check_reverse()
 
     def __init__(self, SD_report_fn, monomers_fn, max_gap=100, gap_symb='?'):
         self.gap_symb = gap_symb
@@ -81,8 +138,8 @@ class SD_Report:
                                gap_symb=self.gap_symb)
 
     def get_monomer_strings(self):
-        return {r_id: record.string for r_id, record in self.records.items()
-                if len(record.string)}
+        return {r_id: record.string
+                for r_id, record in self.records.items() if len(record.string)}
 
 
 def get_ngap_symbols(monostrings, compr_hmp=False, gap_symb='?'):

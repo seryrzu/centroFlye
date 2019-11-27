@@ -51,20 +51,23 @@ class DeBruijnGraph:
                 self.add_kmer(kmer, coverage=coverage[kmer])
 
     def index_edges(self, min_k=2):
-        all_index = {}
-        for k in range(min_k, self.k+1):
-            index = defaultdict(list)
-            for e_ind, edge in enumerate(self.graph.edges(keys=True)):
-                edge_seq = self.graph.get_edge_data(*edge)['edge_kmer']
-                for i in range(len(edge_seq)-k+1):
-                    kmer = edge_seq[i:i+k]
-                    index[kmer].append((e_ind, i))
-            index_unique = {kmer: pos[0]
-                            for kmer, pos in index.items()
-                            if len(pos) == 1}
-            all_index[k] = index_unique
-        self.db_index = all_index
-        return all_index
+        try:
+            return self.db_index
+        except AttributeError:
+            all_index = {}
+            for k in range(min_k, self.k+1):
+                index = defaultdict(list)
+                for e_ind, edge in enumerate(self.graph.edges(keys=True)):
+                    edge_seq = self.graph.get_edge_data(*edge)['edge_kmer']
+                    for i in range(len(edge_seq)-k+1):
+                        kmer = edge_seq[i:i+k]
+                        index[kmer].append((e_ind, i))
+                index_unique = {kmer: pos[0]
+                                for kmer, pos in index.items()
+                                if len(pos) == 1}
+                all_index[k] = index_unique
+            self.db_index = all_index
+            return all_index
 
     def collapse_nonbranching_paths(self):
         def node_on_nonbranching_path(graph, node):
@@ -343,10 +346,13 @@ def iterative_graph(strings, min_k, max_k, outdir,
     return all_contigs, dbs, all_frequent_kmers, all_frequent_kmers_read_pos
 
 
-def scaffolding(db, mappings, min_connections=3):
-    def find_connections():
+def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
+    def find_connections(additional_edges):
         long_edges = db.get_long_edges()
-        long_edges_ids = set(long_edges.keys())
+        long_edges_ids = list(long_edges.keys())
+        long_edges_ids += additional_edges
+        long_edges_ids = set(long_edges_ids)
+
         connections = defaultdict(lambda: defaultdict(int))
         for r_id, mapping in mappings.items():
             if mapping is None:
@@ -365,13 +371,17 @@ def scaffolding(db, mappings, min_connections=3):
                         long_edge_pair = (path[i], path[j])
                         connection = tuple(path[i:j+1])
                         connections[long_edge_pair][connection] += 1
+        for e1, e2 in connections:
+            print(e1, e2)
+            print(connections[(e1, e2)])
+            print("")
         return connections
 
     def build_scaffold_graph(connections):
         scaffold_graph = nx.DiGraph()
         for (e1, e2), connection_counts in connections.items():
             n_support_connections = sum(connection_counts.values())
-            if n_support_connections > min_connections:
+            if n_support_connections >= min_connections:
                 scaffold_graph.add_edge(e1, e2,
                                         connections=connection_counts)
         return scaffold_graph
@@ -440,10 +450,14 @@ def scaffolding(db, mappings, min_connections=3):
             scaffolds.append(scaffold)
         return scaffolds
 
-    connections = find_connections()
+    connections = find_connections(additional_edges=additional_edges)
+    # for (e1, e2) in connections:
+    #     print(e1, e2)
+    #     print(connections[(e1, e2)])
     scaffold_graph = build_scaffold_graph(connections)
+    nx.drawing.nx_pydot.write_dot(scaffold_graph, 'scaffold graph.dot')
     longedge_scaffolds = select_lists(scaffold_graph)
     edge_scaffolds = get_edge_scaffolds(longedge_scaffolds,
                                         connections)
     scaffolds = get_sequence_scaffolds(edge_scaffolds)
-    return scaffolds
+    return scaffolds, edge_scaffolds
