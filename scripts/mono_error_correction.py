@@ -92,6 +92,7 @@ def correct_gaps(monostrings, max_gap=0.3, nhor=1,
                                              match_char=set(gap_symb))
                     if hd == 0:
                         monostring[i:i+hor_len] = list(hor)
+        monostring.assert_validity()
     return monostrings
 
 

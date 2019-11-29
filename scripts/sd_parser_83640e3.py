@@ -149,8 +149,6 @@ class MonoString:
             resulting_monostrings[(self.name, i)] = new_monostring
             cumm_len += len(split_string) + 1
         return resulting_monostrings
-
-
 class SD_Report:
     def __init__(self, SD_report_fn, monomers_fn, max_gap=100, gap_symb='?'):
         self.gap_symb = gap_symb

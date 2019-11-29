@@ -127,6 +127,20 @@ class DeBruijnGraph:
             path = path[:-(self.k-1)]
         return path
 
+    def get_edgepath2coords(self, list_edges):
+        edgepath2coords = {}
+        str_coord = 0
+        path = self.get_path(list_edges)
+        for i, edge_id in enumerate(list_edges):
+            edge_str = self.graph.get_edge_data(*edge_id)['edge_kmer']
+            for j in range(len(edge_str)):
+                assert path[str_coord] == edge_str[j]
+                edgepath2coords[(i, j)] = str_coord
+                str_coord += 1
+            str_coord -= (self.k - 1)
+            edgepath2coords[i] = str_coord
+        return edgepath2coords
+
     def get_contigs(self):
         def get_longest_valid_outpaths(graph):
             def get_valid_outpath_edge(edge, taken_edges=set()):
@@ -202,24 +216,30 @@ class DeBruijnGraph:
         contigs = list(set(contigs))
         return contigs, valid_paths
 
-    def map_reads(self, monomer_strings, gap_symb='?', verbose=True):
+    def map_reads(self, monoreads, gap_symb='?', verbose=True):
         self.index_edges()
         mapping = {}
         db_edges = list(self.graph.edges(keys=True))
-        for i, (r_id, string) in enumerate(monomer_strings.items()):
+        monoreads = {r_id: ''.join(monoread.string)
+                     for r_id, monoread in monoreads.items()}
+        for i, (r_id, string) in enumerate(monoreads.items()):
             if verbose:
-                print(i+1, len(monomer_strings))
+                print(i+1, len(monoreads))
 
-            split_strings = list(filter(lambda string: len(string),
-                                        string.split(gap_symb)))
+            split_strings = string.split(gap_symb)
             read_coords = []
+            cumm_len = 0
             for split_ind, split_string in enumerate(split_strings):
                 for i in range(len(split_string)-self.k+1):
                     kmer = split_string[i:i+self.k]
                     if kmer in self.db_index[len(kmer)]:
-                        read_coords.append(self.db_index[len(kmer)][kmer])
+                        read_coords.append((self.db_index[len(kmer)][kmer],
+                                            cumm_len + i))
+                        string_kmer = string[cumm_len+i:cumm_len+i+min(self.k, len(split_string))]
+                        assert string_kmer == kmer
+                cumm_len += len(split_string) + 1
 
-            path = [x[0] for x in read_coords]
+            path = [x[0][0] for x in read_coords]
             path = [x[0] for x in groupby(path)]
             path = [db_edges[edge_ind] for edge_ind in path]
 
@@ -291,11 +311,12 @@ def get_frequent_kmers(strings, k, min_mult=5):
     return frequent_kmers, frequent_kmers_read_pos
 
 
-def iterative_graph(strings, min_k, max_k, outdir,
+def iterative_graph(monostrings, min_k, max_k, outdir,
                     min_mult=5, step=1, starting_graph=None, verbose=True):
     smart_makedirs(outdir)
     dbs, all_contigs = {}, {}
     all_frequent_kmers, all_frequent_kmers_read_pos = {}, {}
+    strings = {k: ''.join(v.string) for k, v in monostrings.items()}
     input_strings = strings.copy()
     complex_kp1mers = {}
 
@@ -371,10 +392,6 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
                         long_edge_pair = (path[i], path[j])
                         connection = tuple(path[i:j+1])
                         connections[long_edge_pair][connection] += 1
-        for e1, e2 in connections:
-            print(e1, e2)
-            print(connections[(e1, e2)])
-            print("")
         return connections
 
     def build_scaffold_graph(connections):
@@ -461,3 +478,71 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
                                         connections)
     scaffolds = get_sequence_scaffolds(edge_scaffolds)
     return scaffolds, edge_scaffolds
+
+
+def read2scaffolds(db, scaffold_paths, mappings, monoreads):
+    edgescaffolds2coords = [db.get_edgepath2coords(scaffold_path)
+                            for scaffold_path in scaffold_paths]
+    r2s = {}
+
+    for r_id, mapping in mappings.items():
+        if mapping is None:
+            continue
+        (e_st, r_st), (e_en, r_en), valid_path, read_path = mapping
+        if not valid_path:
+            continue
+        for sc_index, scaffold_path in enumerate(scaffold_paths):
+            edgescaffold2coords = edgescaffolds2coords[sc_index]
+            for i in range(len(scaffold_path) - len(read_path) + 1):
+                if scaffold_path[i:i+len(read_path)] == read_path:
+                    r2s[r_id] = (
+                        sc_index,
+                        edgescaffold2coords[i, e_st[1]],
+                        edgescaffold2coords[i+len(read_path)-1, e_en[1]+db.k-1]
+                    )
+                    break
+    return r2s
+
+
+def cover_scaffolds_w_reads(r2s, mappings, scaffold_seqs, monoreads, k):
+    coverage = [[{} for i in range(len(scaffold_seq))] for scaffold_seq in scaffold_seqs]
+    for r_id, (scaf_id, s_st, s_en) in r2s.items():
+        (_, r_st), (_, r_en), valid_path, path = mappings[r_id]
+        if not valid_path:
+            continue
+        # TODO: fixit
+        if s_en - s_st != r_en - r_st + k - 1:
+            continue
+        cov_scaf = coverage[scaf_id]
+        r_mono2nucl = monoreads[r_id].mono2nucl
+        for i in range(s_en - s_st + 1):
+            if r_st + i in r_mono2nucl:
+                cov_scaf[s_st+i][monoreads[r_id].name] = r_mono2nucl[r_st+i]
+            else:
+                # a corrected gap
+                pass
+    return coverage
+
+
+def extract_read_pseudounits(scaf_read_coverage, scaffold_seqs, min_coverage=1):
+    read_pseudounits = []
+    for i, scaffold_seq in enumerate(scaffold_seqs):
+        read_pseudounits.append(list())
+        scaf_read_pseudounits = read_pseudounits[-1]
+        sr_coverage = scaf_read_coverage[i]
+        pseudounits = partition_pseudounits(scaffold_seq)
+        for u_st, u_en in pseudounits:
+            s_cov = sr_coverage[u_st]
+            e_cov = sr_coverage[u_en]
+            s_rids = set(s_cov.keys())
+            e_rids = set(e_cov.keys())
+            r_ids = s_rids & e_rids
+            if len(r_ids) < min_coverage:
+                continue
+            scaf_read_pseudounits.append(list())
+            for r_id in r_ids:
+                st = min(s_cov[r_id][1:])
+                en = min(e_cov[r_id][1:])
+                st, en = min(st, en), max(st, en)
+                scaf_read_pseudounits[-1].append((r_id, st, en))
+    return read_pseudounits
