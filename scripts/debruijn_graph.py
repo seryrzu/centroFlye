@@ -2,11 +2,12 @@ from collections import defaultdict, Counter
 from itertools import groupby
 import os
 import subprocess
+import statistics
 
 import networkx as nx
 import numpy as np
 
-from utils.bio import read_bio_seq, read_bio_seqs, write_bio_seqs
+from utils.bio import read_bio_seq, read_bio_seqs, write_bio_seqs, RC
 from utils.os_utils import smart_makedirs
 
 
@@ -521,7 +522,7 @@ def cover_scaffolds_w_reads(r2s, mappings, scaffold_seqs, monoreads, k):
         r_mono2nucl = monoreads[r_id].mono2nucl
         for i in range(s_en - s_st + 1):
             if r_st + i in r_mono2nucl:
-                cov_scaf[s_st+i][monoreads[r_id].name] = r_mono2nucl[r_st+i]
+                cov_scaf[s_st+i][r_id] = r_mono2nucl[r_st+i]
             else:
                 # a corrected gap
                 pass
@@ -547,7 +548,8 @@ def partition_pseudounits(monostring):
     return pseudounits
 
 
-def extract_read_pseudounits(scaf_read_coverage, scaffold_seqs, min_coverage=0):
+def extract_read_pseudounits(scaf_read_coverage, scaffold_seqs,
+                             monostrings, min_coverage=0):
     read_pseudounits, pseudounits = [], []
     for i, scaffold_seq in enumerate(scaffold_seqs):
         read_pseudounits.append(list())
@@ -567,12 +569,13 @@ def extract_read_pseudounits(scaf_read_coverage, scaffold_seqs, min_coverage=0):
             for r_id in r_ids:
                 coords = s_cov[r_id][1:] + e_cov[r_id][1:]
                 st, en = min(coords), max(coords)
-                scaf_read_pseudounits[-1][r_id] = (st, en)
+                strand = monostrings[r_id].strand
+                scaf_read_pseudounits[-1][r_id] = (st, en, strand)
     return pseudounits, read_pseudounits
 
 
 def polish(scaffolds, pseudounits, read_pseudounits, reads, monomers, outdir,
-           flye_bin='flye', n_iter=2, n_threads=4):
+           flye_bin='flye', n_iter=1, n_threads=8):
     def get_template(scaffold, st, en):
         return ''.join(monomers[m_id] for m_id in scaffold[st:en+1])
     monomers = {m_id[0]: monomer
@@ -589,17 +592,34 @@ def polish(scaffolds, pseudounits, read_pseudounits, reads, monomers, outdir,
             pseudounit_outdir = os.path.join(scaf_outdir, f'pseudounit_{j}')
             smart_makedirs(pseudounit_outdir)
 
-            template = get_template(scaffold, s_st, s_en)
-            template_fn = os.path.join(pseudounit_outdir, 'template.fasta')
-            template_id = f'scaffold_{i}_template_{j}_{scaffold[s_st:s_en+1]}'
-            write_bio_seqs(template_fn, {template_id: template})
+            # template = get_template(scaffold, s_st, s_en)
+            # template_id = f'scaffold_{i}_template_{j}_{scaffold[s_st:s_en+1]}'
+            # write_bio_seqs(template_fn, {template_id: template})
 
             pseudounit_reads = {}
-            for r_id, (r_st, r_en) in read_pseudounits[i][j].items():
-                read_segm_id = f's_{i}_t_{j}_{r_id}_{r_st}_{r_en+1}'
-                pseudounit_reads[read_segm_id] = reads[r_id][r_st:r_en+1]
+            for r_id, (r_st, r_en, strand) in read_pseudounits[i][j].items():
+                read_segm_id = f's_{i}_t_{j}_{r_id[0]}_{r_st}_{r_en+1}'
+                pseudounit_read = reads[r_id[0]][r_st:r_en+1]
+                if strand == '-':
+                    pseudounit_read = RC(pseudounit_read)
+                pseudounit_reads[read_segm_id] = pseudounit_read
             reads_fn = os.path.join(pseudounit_outdir, 'reads.fasta')
             write_bio_seqs(reads_fn, pseudounit_reads)
+
+            template_fn = os.path.join(pseudounit_outdir, 'template.fasta')
+            template_id, template_read = "", None
+            r_units_lens = [len(read) for read in pseudounit_reads.values()]
+            med_len = statistics.median_high(r_units_lens)
+            for r_id in sorted(pseudounit_reads.keys()):
+                read = pseudounit_reads[r_id]
+                if len(read) == med_len:
+                    template_id = r_id
+                    template_read = read
+                    break
+            assert len(pseudounit_reads[template_id]) == med_len
+            assert len(template_read) == med_len
+            write_bio_seqs(template_fn,
+                           {template_id: template_read})
 
             cmd = [flye_bin,
                    '--nano-raw', reads_fn,
