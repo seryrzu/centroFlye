@@ -149,6 +149,8 @@ class MonoString:
             resulting_monostrings[(self.name, i)] = new_monostring
             cumm_len += len(split_string) + 1
         return resulting_monostrings
+
+
 class SD_Report:
     def __init__(self, SD_report_fn, monomers_fn, max_gap=100, gap_symb='?'):
         self.gap_symb = gap_symb
@@ -157,10 +159,12 @@ class SD_Report:
             np.mean([len(monomer) for monomer in monomers.values()])
 
         self.monomer_names_map = {}
+        self.rev_monomer_names_map = {}
         for monomer_name, ucode, lcode in \
                 zip(monomers.keys(), ascii_uppercase, ascii_lowercase):
             self.monomer_names_map[monomer_name] = ucode
             self.monomer_names_map[monomer_name + "'"] = lcode
+            self.rev_monomer_names_map[ucode] = monomer_name
 
         self.monostrings = {}
         df = pd.read_csv(SD_report_fn, sep='\t',

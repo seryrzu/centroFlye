@@ -1,10 +1,12 @@
 from collections import defaultdict, Counter
 from itertools import groupby
 import os
+import subprocess
 
 import networkx as nx
 import numpy as np
 
+from utils.bio import read_bio_seq, read_bio_seqs, write_bio_seqs
 from utils.os_utils import smart_makedirs
 
 
@@ -495,12 +497,14 @@ def read2scaffolds(db, scaffold_paths, mappings, monoreads):
             edgescaffold2coords = edgescaffolds2coords[sc_index]
             for i in range(len(scaffold_path) - len(read_path) + 1):
                 if scaffold_path[i:i+len(read_path)] == read_path:
+                    if r_id in r2s:
+                        del r2s[r_id]
+                        break
                     r2s[r_id] = (
                         sc_index,
                         edgescaffold2coords[i, e_st[1]],
                         edgescaffold2coords[i+len(read_path)-1, e_en[1]+db.k-1]
                     )
-                    break
     return r2s
 
 
@@ -524,14 +528,34 @@ def cover_scaffolds_w_reads(r2s, mappings, scaffold_seqs, monoreads, k):
     return coverage
 
 
-def extract_read_pseudounits(scaf_read_coverage, scaffold_seqs, min_coverage=1):
-    read_pseudounits = []
+def partition_pseudounits(monostring):
+    pseudounits = []
+    i = 0
+    while i < len(monostring):
+        j = 0
+        monomer_cnt = Counter()
+        while i+j < len(monostring):
+            monomer = monostring[i+j]
+            monomer_cnt[monomer] += 1
+            if monomer_cnt[monomer] > 1:
+                break
+            j += 1
+        pseudounit = (i, i + j - 1)
+        pseudounits.append(pseudounit)
+        i += j
+
+    return pseudounits
+
+
+def extract_read_pseudounits(scaf_read_coverage, scaffold_seqs, min_coverage=0):
+    read_pseudounits, pseudounits = [], []
     for i, scaffold_seq in enumerate(scaffold_seqs):
         read_pseudounits.append(list())
         scaf_read_pseudounits = read_pseudounits[-1]
         sr_coverage = scaf_read_coverage[i]
-        pseudounits = partition_pseudounits(scaffold_seq)
-        for u_st, u_en in pseudounits:
+        scaf_pseudounits = partition_pseudounits(scaffold_seq)
+        pseudounits.append(scaf_pseudounits)
+        for u_st, u_en in scaf_pseudounits:
             s_cov = sr_coverage[u_st]
             e_cov = sr_coverage[u_en]
             s_rids = set(s_cov.keys())
@@ -539,10 +563,64 @@ def extract_read_pseudounits(scaf_read_coverage, scaffold_seqs, min_coverage=1):
             r_ids = s_rids & e_rids
             if len(r_ids) < min_coverage:
                 continue
-            scaf_read_pseudounits.append(list())
+            scaf_read_pseudounits.append(dict())
             for r_id in r_ids:
-                st = min(s_cov[r_id][1:])
-                en = min(e_cov[r_id][1:])
-                st, en = min(st, en), max(st, en)
-                scaf_read_pseudounits[-1].append((r_id, st, en))
-    return read_pseudounits
+                coords = s_cov[r_id][1:] + e_cov[r_id][1:]
+                st, en = min(coords), max(coords)
+                scaf_read_pseudounits[-1][r_id] = (st, en)
+    return pseudounits, read_pseudounits
+
+
+def polish(scaffolds, pseudounits, read_pseudounits, reads, monomers, outdir,
+           flye_bin='flye', n_iter=2, n_threads=4):
+    def get_template(scaffold, st, en):
+        return ''.join(monomers[m_id] for m_id in scaffold[st:en+1])
+    monomers = {m_id[0]: monomer
+                for m_id, monomer in monomers.items()
+                if m_id[-1] != "'"}
+    smart_makedirs(outdir)
+    for i, (scaffold, scaf_pseudounits) in enumerate(zip(scaffolds,
+                                                         pseudounits)):
+        scaf_outdir = os.path.join(outdir, f'scaffold_{i}')
+        smart_makedirs(scaf_outdir)
+
+        polished_scaffold = []
+        for j, (s_st, s_en) in enumerate(scaf_pseudounits):
+            pseudounit_outdir = os.path.join(scaf_outdir, f'pseudounit_{j}')
+            smart_makedirs(pseudounit_outdir)
+
+            template = get_template(scaffold, s_st, s_en)
+            template_fn = os.path.join(pseudounit_outdir, 'template.fasta')
+            template_id = f'scaffold_{i}_template_{j}_{scaffold[s_st:s_en+1]}'
+            write_bio_seqs(template_fn, {template_id: template})
+
+            pseudounit_reads = {}
+            for r_id, (r_st, r_en) in read_pseudounits[i][j].items():
+                read_segm_id = f's_{i}_t_{j}_{r_id}_{r_st}_{r_en+1}'
+                pseudounit_reads[read_segm_id] = reads[r_id][r_st:r_en+1]
+            reads_fn = os.path.join(pseudounit_outdir, 'reads.fasta')
+            write_bio_seqs(reads_fn, pseudounit_reads)
+
+            cmd = [flye_bin,
+                   '--nano-raw', reads_fn,
+                   '--polish-target', template_fn,
+                   '-i', n_iter,
+                   '-t', n_threads,
+                   '-o', pseudounit_outdir]
+            cmd = [str(x) for x in cmd]
+            print(' '.join(cmd))
+            subprocess.check_call(cmd)
+
+            try:
+                polished_pseudounit_fn = \
+                    os.path.join(pseudounit_outdir,
+                                 f'polished_{n_iter}.fasta')
+                polished_pseudounit = read_bio_seq(polished_pseudounit_fn)
+                polished_scaffold.append(polished_pseudounit)
+            except FileNotFoundError:
+                polished_scaffold.append(template)
+
+        polished_scaffold = ''.join(polished_scaffold)
+        polished_scaffold_fn = os.path.join(scaf_outdir, f'scaffold_{i}.fasta')
+        write_bio_seqs(polished_scaffold_fn,
+                       {f'scaffold_{i}_niter_{n_iter}': polished_scaffold})
