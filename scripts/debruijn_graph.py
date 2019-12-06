@@ -486,7 +486,7 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
 def read2scaffolds(db, scaffold_paths, mappings, monoreads):
     edgescaffolds2coords = [db.get_edgepath2coords(scaffold_path)
                             for scaffold_path in scaffold_paths]
-    r2s = {}
+    r2s = defaultdict(list)
 
     for r_id, mapping in mappings.items():
         if mapping is None:
@@ -498,14 +498,15 @@ def read2scaffolds(db, scaffold_paths, mappings, monoreads):
             edgescaffold2coords = edgescaffolds2coords[sc_index]
             for i in range(len(scaffold_path) - len(read_path) + 1):
                 if scaffold_path[i:i+len(read_path)] == read_path:
-                    if r_id in r2s:
-                        del r2s[r_id]
-                        break
-                    r2s[r_id] = (
+                    # if r_id in r2s:
+                    #     print(r_id, sc_index, i)
+                    #     ambiguous_mappings.add(r_id)
+                    r2s[r_id].append((
                         sc_index,
                         edgescaffold2coords[i, e_st[1]],
                         edgescaffold2coords[i+len(read_path)-1, e_en[1]+db.k-1]
-                    )
+                    ))
+    r2s = {k: v[0] for k, v in r2s.items() if len(v) == 1}
     return r2s
 
 
