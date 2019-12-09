@@ -7,6 +7,7 @@ from debruijn_graph import iterative_graph, scaffolding, read2scaffolds,\
 from sd_parser_83640e3 import SD_Report
 from mono_error_correction import error_correction
 
+from utils.os_utils import smart_makedirs
 from utils.bio import read_bio_seqs
 
 
@@ -45,6 +46,7 @@ def parse_args():
 
 def main():
     params = parse_args()
+    smart_makedirs(params.outdir)
 
     print('Reading report')
     sd_report = SD_Report(SD_report_fn=params.sd_report,
