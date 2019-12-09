@@ -40,6 +40,14 @@ def parse_args():
                         help='Min mult for a frequent mono-k-mer',
                         type=int,
                         default=5)
+    parser.add_argument('--polish-n-iter',
+                        help='Number of iterations of Flye polishing',
+                        type=int,
+                        default=2)
+    parser.add_argument('--polish-n-threads',
+                        help='Number of iterations of Flye polishing',
+                        type=int,
+                        default=50)
     params = parser.parse_args()
     return params
 
@@ -65,7 +73,6 @@ def main():
                         outdir=os.path.join(params.outdir, 'idb'),
                         min_mult=params.min_mult)
     db = dbs[params.max_k]
-
 
     print('Mapping reads to the graph')
     mappings = db.map_reads(ec_monostrings, verbose=False)
@@ -103,7 +110,9 @@ def main():
            read_pseudounits=read_pseudounits,
            reads=centromeric_reads,
            monomers=monomers,
-           outdir='polishing')
+           outdir=os.path.join(params.outdir, 'polishing'),
+           n_iter=params.polish_n_iter,
+           n_threads=params.polish_n_threads)
 
 
 if __name__ == "__main__":
