@@ -475,7 +475,7 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
     #     print(e1, e2)
     #     print(connections[(e1, e2)])
     scaffold_graph = build_scaffold_graph(connections)
-    nx.drawing.nx_pydot.write_dot(scaffold_graph, 'scaffold graph.dot')
+    # nx.drawing.nx_pydot.write_dot(scaffold_graph, 'scaffold graph.dot')
     longedge_scaffolds = select_lists(scaffold_graph)
     edge_scaffolds = get_edge_scaffolds(longedge_scaffolds,
                                         connections)

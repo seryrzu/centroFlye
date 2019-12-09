@@ -77,6 +77,7 @@ def correct_gaps(monostrings, max_gap=0.3, nhor=1,
 
     hors, _ = db.get_contigs()
     hors = [min_cyclic_shift(hor) for hor in hors]
+    hors.sort()
     corrected_strings = {}
     for r_id, monostring in monostrings.items():
         for single_hor in hors:
