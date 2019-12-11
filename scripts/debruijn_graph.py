@@ -576,7 +576,7 @@ def extract_read_pseudounits(scaf_read_coverage, scaffold_seqs,
 
 
 def polish(scaffolds, pseudounits, read_pseudounits, reads, monomers, outdir,
-           flye_bin='flye', n_iter=1, n_threads=8):
+           n_iter, n_threads, flye_bin='flye'):
     def get_template(scaffold, st, en):
         return ''.join(monomers[m_id] for m_id in scaffold[st:en+1])
     monomers = {m_id[0]: monomer
