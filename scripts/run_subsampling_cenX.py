@@ -20,6 +20,7 @@ unit_fn = f'{SCRIPT_DIR}/../supplementary_data/DXZ1_rc.fasta'
 def run(all_reads, seed, cut_freq, pread, outdir):
     print('New run')
     print(seed, cut_freq, pread)
+    random.seed(seed)
     nreads = int(len(all_reads)*pread)
     read_ids = random.sample(all_reads.keys(), nreads)
     reads = {r_id: all_reads[r_id] for r_id in read_ids}
