@@ -18,6 +18,7 @@ unit_fn = f'{SCRIPT_DIR}/../supplementary_data/DXZ1_rc.fasta'
 
 
 def run(all_reads, seed, cut_freq, pread, outdir):
+    print('New run')
     print(seed, cut_freq, pread)
     nreads = int(len(all_reads)*pread)
     read_ids = random.sample(all_reads.keys(), nreads)
@@ -37,7 +38,7 @@ def run(all_reads, seed, cut_freq, pread, outdir):
                 '-t', '50',
                 '--outdir', ncrf_outdir,
                 '--repeat', unit_fn]
-    print(''.join(ncrf_cmd))
+    print(' '.join(ncrf_cmd))
     subprocess.call(ncrf_cmd)
     ncrf_fn = os.path.join(ncrf_outdir, 'report.ncrf')
 
@@ -48,7 +49,7 @@ def run(all_reads, seed, cut_freq, pread, outdir):
                 '--coverage', str(int(32 * pread * read_reduction)),
                 '--min-coverage', '4',
                 '--outdir', recr_outdir]
-    print(''.join(recr_cmd))
+    print(' '.join(recr_cmd))
     subprocess.call(recr_cmd)
     kmers_fn = os.path.join(recr_outdir, 'unique_kmers_min_edge_cov_4.txt')
 
@@ -58,7 +59,7 @@ def run(all_reads, seed, cut_freq, pread, outdir):
                   '--ncrf', ncrf_fn,
                   '--genomic-kmers', kmers_fn,
                   '--outdir', placer_outdir]
-    print(''.join(placer_cmd))
+    print(' '.join(placer_cmd))
     subprocess.call(placer_cmd)
     read_pos_fn = os.path.join(placer_outdir, 'read_positions.csv')
 
@@ -73,7 +74,7 @@ def run(all_reads, seed, cut_freq, pread, outdir):
                     '--num-iters', '4',
                     '--num-threads', '50',
                     '--unit', unit_fn]
-    print(''.join(polisher_cmd))
+    print(' '.join(polisher_cmd))
     subprocess.call(polisher_cmd)
 
 
