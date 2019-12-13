@@ -33,7 +33,7 @@ def run(all_reads, seed, cut_freq, pread, outdir):
 
     # Run NCRF
     ncrf_outdir = os.path.join(outdir, 'NCRF_rc')
-    ncrf_cmd = ['python', f'{SCRIPT_DIR}/run_ncrf_parallel.py',
+    ncrf_cmd = ['python', '-u', f'{SCRIPT_DIR}/run_ncrf_parallel.py',
                 '--reads', reads_fn,
                 '-t', '50',
                 '--outdir', ncrf_outdir,
@@ -44,7 +44,7 @@ def run(all_reads, seed, cut_freq, pread, outdir):
 
     # Run k-mer recruitment
     recr_outdir = os.path.join(outdir, 'recruited_unique_kmers')
-    recr_cmd = ['python', f'{SCRIPT_DIR}/distance_based_kmer_recruitment.py',
+    recr_cmd = ['python', '-u', f'{SCRIPT_DIR}/distance_based_kmer_recruitment.py',
                 '--ncrf', ncrf_fn,
                 '--coverage', str(int(32 * pread * read_reduction)),
                 '--min-coverage', '4',
@@ -55,7 +55,7 @@ def run(all_reads, seed, cut_freq, pread, outdir):
 
     # Run read placer
     placer_outdir = os.path.join(outdir, 'tr_resolution')
-    placer_cmd = ['python', f'{SCRIPT_DIR}/read_placer.py',
+    placer_cmd = ['python', '-u', f'{SCRIPT_DIR}/read_placer.py',
                   '--ncrf', ncrf_fn,
                   '--genomic-kmers', kmers_fn,
                   '--outdir', placer_outdir]
@@ -65,7 +65,7 @@ def run(all_reads, seed, cut_freq, pread, outdir):
 
     # Run ELTR polisher
     polisher_outdir = os.path.join(outdir, 'polishing')
-    polisher_cmd = ['python', f'{SCRIPT_DIR}/eltr_polisher.py',
+    polisher_cmd = ['python', '-u', f'{SCRIPT_DIR}/eltr_polisher.py',
                     '--read-placement', read_pos_fn,
                     '--outdir', polisher_outdir,
                     '--ncrf', ncrf_fn,
