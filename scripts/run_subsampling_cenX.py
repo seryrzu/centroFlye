@@ -9,7 +9,7 @@ from utils.trim_seqs import trim_seqs
 
 
 seeds = [12398182, 3812983, 1723992]
-preads = [1, 0.95, 0.9, 0.8]
+preads = [0.95, 0.9, 0.8]
 cut_freqs = [0, 0.1, 0.2]
 
 
