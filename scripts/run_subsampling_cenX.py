@@ -9,8 +9,8 @@ from utils.trim_seqs import trim_seqs
 
 
 seeds = [12398182, 3812983, 1723992]
-preads = [0.95, 0.9, 0.8]
-cut_freqs = [0, 0.1, 0.2]
+preads = [1, 0.95, 0.9, 0.85]
+cut_freqs = [0, 0.05, 0.1]
 
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -21,12 +21,13 @@ def run(all_reads, seed, cut_freq, pread, outdir):
     print('New run')
     print(seed, cut_freq, pread)
     random.seed(seed)
+
     nreads = int(len(all_reads)*pread)
     read_ids = random.sample(all_reads.keys(), nreads)
     reads = {r_id: all_reads[r_id] for r_id in read_ids}
     reads = trim_seqs(reads, cut_freq)
     read_reduction = sum(len(v) for v in reads.values()) / \
-                     sum(len(v) for v in all_reads.values())
+                     sum(len(all_reads[r_id]) for r_id in reads.keys())
     print('read_reduction', read_reduction)
     reads_fn = os.path.join(outdir, 'centromeric_reads.fasta')
     print(reads_fn)
@@ -91,6 +92,8 @@ def main():
     for seed in seeds:
         for pread in preads:
             for cut_freq in cut_freqs:
+                if pread == 1 and cut_freq == 0:
+                    continue
                 iter_outdir = \
                     os.path.join(params.outdir,
                                  f'pread_{pread}_cutfreq_{cut_freq}_seed_{seed}')
