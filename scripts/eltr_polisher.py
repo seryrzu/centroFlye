@@ -174,7 +174,7 @@ def main():
     parser.add_argument("--outdir", required=True)
     parser.add_argument("--ncrf", required=True)
     parser.add_argument("--flye-bin", default='flye')
-    parser.add_argument("--error-mode", default="pacbio")
+    parser.add_argument("--error-mode", default="nano")
     parser.add_argument("--num-iters", default=2, type=int)
     parser.add_argument("--num-threads", default=16, type=int)
     parser.add_argument("--output-progress", action='store_false')
