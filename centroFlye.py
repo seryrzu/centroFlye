@@ -1,11 +1,10 @@
 import argparse
-import sys
 import math
-# import os
-# import random
-# import subprocess
-#
-# from scripts.utils.bio import read_bio_seqs, write_bio_seqs
+import os
+import sys
+import subprocess
+
+from scripts.utils.bio import read_bio_seqs, write_bio_seqs
 # from scripts.utils.os_utils import smart_makedirs
 # from scripts.utils.trim_seqs import trim_seqs
 
@@ -197,26 +196,30 @@ def parse_args():
 #     subprocess.call(polisher_cmd)
 
 
+class CentroFlye:
+    def __init__(self, params):
+        self.params = params
+
+    def run_NCRF(self):
+        ncrf_outdir=os.path.join(self.params.outdir, "NCRF_rc")
+        # ncrf_cmd=["python", "-u", f"{SCRIPT_DIR}/run_ncrf_parallel.py",
+        #             "--reads", reads_fn,
+        #             "-t", "50",
+        #             "--outdir", ncrf_outdir,
+        #             "--repeat", unit_fn]
+        # print(" ".join(ncrf_cmd))
+        # subprocess.call(ncrf_cmd)
+        # ncrf_fn=os.path.join(ncrf_outdir, "report.ncrf")
+        # return ncrf_fn
+
+    def run(self):
+        all_reads = read_bio_seqs(self.params.reads)
+        smart_makedirs(self.params.outdir)
+
+
 def main():
     params = parse_args()
-
-    # all_reads = read_bio_seqs(params.reads)
-    # smart_makedirs(params.outdir)
-
-    # for seed in seeds:
-    #     for pread in preads:
-    #         for cut_freq in cut_freqs:
-    #             if pread == 1 and cut_freq == 0:
-    #                 continue
-    #             iter_outdir = \
-    #                 os.path.join(params.outdir,
-    #                              f"pread_{pread}_cutfreq_{cut_freq}_seed_{seed}")
-    #             smart_makedirs(iter_outdir)
-    #             run(all_reads=all_reads,
-    #                 seed=seed,
-    #                 cut_freq=cut_freq,
-    #                 pread=pread,
-    #                 outdir=iter_outdir)
+    CentroFlye(params).run()
 
 
 if __name__ == "__main__":
