@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--min-coverage',
                         help='minCov threshold',
                         type=int,
-                        required=True)
+                        default=4)
     parser.add_argument('--outdir', help='Output directory', required=True)
     parser.add_argument('-k', type=int, default=19)
     parser.add_argument('--min-nreads', type=int, default=0)
@@ -40,7 +40,7 @@ def get_kmer_freqs_from_ncrf_report(reads_ncrf_report,
                                     k, verbose,
                                     max_nonuniq):
     non_unique_freqs = defaultdict(int)
-    rare_freq = defaultdict(int)
+    all_kmers = defaultdict(int)
     for i, (r_id, record) in enumerate(reads_ncrf_report.records.items()):
         if i % 100 == 0 and verbose:
             print(i + 1, len(reads_ncrf_report.records))
@@ -56,11 +56,11 @@ def get_kmer_freqs_from_ncrf_report(reads_ncrf_report,
             if freq > 1:
                 non_unique_freqs[kmer] += 1
             if non_unique_freqs[kmer] <= max_nonuniq:
-                rare_freq[kmer] += 1
+                all_kmers[kmer] += 1
             else:
-                if kmer in rare_freq:
-                    del rare_freq[kmer]
-    return rare_freq
+                if kmer in all_kmers:
+                    del all_kmers[kmer]
+    return all_kmers
 
 
 def get_rare_kmers(reads_ncrf_report, k,
