@@ -1,8 +1,10 @@
 import argparse
 import math
 import os
-import sys
+
+import shutil
 import subprocess
+import sys
 
 from scripts.utils.os_utils import smart_makedirs
 from scripts.utils.various import list2str, listEls2str
@@ -139,6 +141,10 @@ class CentroFlye:
                                         "distance_based_kmer_recruitment.py")
         self.placer_script = os.path.join(SCRIPTS_DIR, "read_placer.py")
         self.polisher_script = os.path.join(SCRIPTS_DIR, "eltr_polisher.py")
+        self.tandemPolisher = os.path.join(SCRIPTS_DIR,
+                                           "ext",
+                                           "tandemQUAST",
+                                           "tandemquast.py")
 
     def run_NCRF(self):
         ncrf_outdir = os.path.join(self.params.outdir, "NCRF")
@@ -198,7 +204,7 @@ class CentroFlye:
         return read_pos_fn
 
     def run_polisher(self, ncrf_fn, read_pos_fn):
-        polisher_outdir = os.path.join(self.params.outdir, "polishing")
+        polisher_outdir = os.path.join(self.params.outdir, "polishing1")
         polisher_cmd = ["python", "-u", self.polisher_script,
                         "--read-placement", read_pos_fn,
                         "--outdir", polisher_outdir,
@@ -213,16 +219,47 @@ class CentroFlye:
             polisher_cmd.append("--max-pos")
             polisher_cmd.append(self.params.max_pos)
         polisher_cmd = listEls2str(polisher_cmd)
-        print("Running polishing")
+        print("Running polishing -- first stage")
         print(list2str(polisher_cmd))
         subprocess.call(polisher_cmd)
+        assembly_fn = \
+            os.path.join(
+                polisher_outdir,
+                f'final_sequence_{self.params.num_polish_iters}.fasta'
+            )
+        return assembly_fn
+
+    def run_tandemPolisher(self, assembly_fn):
+        polisher_outdir = os.path.join(self.params.outdir, "polishing2")
+        polisher_cmd = ["python", "-u", self.tandemPolisher,
+                        "-r", self.params.reads,
+                        "-o", polisher_outdir,
+                        "--only-polish",
+                        "-t", self.params.threads,
+                        assembly_fn]
+        polisher_cmd = listEls2str(polisher_cmd)
+        print("Running polishing with tandemMapper")
+        print(list2str(polisher_cmd))
+        subprocess.call(polisher_cmd)
+        polished_assembly_fn = \
+            os.path.join(polisher_outdir, 'polished', 'polished_2.fasta')
+        return polished_assembly_fn
+
+    def copy_final_assembly(self, polished_assembly_fn):
+        final_assembly_fn = os.path.join(self.params.outdir,
+                                         'final_assembly.fasta')
+        shutil.copyfile(polished_assembly_fn, final_assembly_fn)
+        print(f"Final polished assembly is stored at {final_assembly_fn}")
 
     def run(self):
         smart_makedirs(self.params.outdir)
         ncrf_fn = self.run_NCRF()
         kmers_fn = self.run_kmer_recr(ncrf_fn)
         read_pos_fn = self.run_read_placer(ncrf_fn=ncrf_fn, kmers_fn=kmers_fn)
-        self.run_polisher(ncrf_fn=ncrf_fn, read_pos_fn=read_pos_fn)
+        assembly_fn = self.run_polisher(ncrf_fn=ncrf_fn,
+                                        read_pos_fn=read_pos_fn)
+        polished_assembly_fn = self.run_tandemPolisher(assembly_fn=assembly_fn)
+        self.copy_final_assembly(polished_assembly_fn)
 
 
 def main():
