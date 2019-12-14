@@ -4,12 +4,8 @@ import os
 import sys
 import subprocess
 
-from scripts.utils.bio import read_bio_seqs, write_bio_seqs
-# from scripts.utils.os_utils import smart_makedirs
-# from scripts.utils.trim_seqs import trim_seqs
-
-
-# SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+from scripts.utils.os_utils import smart_makedirs
+from scripts.utils.various import list2str, listEls2str
 
 
 def parse_args():
@@ -113,7 +109,7 @@ def parse_args():
     polisher_args.add_argument("--error-mode",
                                help='Error mode: nano/pacbio',
                                default="pacbio")
-    polisher_args.add_argument("--num-iters",
+    polisher_args.add_argument("--num-polish-iters",
                                help='Number of iterations',
                                default=2,
                                type=int)
@@ -133,88 +129,100 @@ def parse_args():
     return params
 
 
-# def run(all_reads, seed, cut_freq, pread, outdir):
-#     print("New run")
-#     print(seed, cut_freq, pread)
-#     random.seed(seed)
-#
-#     nreads=int(len(all_reads)*pread)
-#     read_ids=random.sample(all_reads.keys(), nreads)
-#     reads={r_id: all_reads[r_id] for r_id in read_ids}
-#     reads=trim_seqs(reads, cut_freq)
-#     read_reduction=sum(len(v) for v in reads.values()) / \
-#                      sum(len(all_reads[r_id]) for r_id in reads.keys())
-#     print("read_reduction", read_reduction)
-#     reads_fn=os.path.join(outdir, "centromeric_reads.fasta")
-#     print(reads_fn)
-#     write_bio_seqs(reads_fn, reads)
-#
-#     # Run NCRF
-#     ncrf_outdir=os.path.join(outdir, "NCRF_rc")
-#     ncrf_cmd=["python", "-u", f"{SCRIPT_DIR}/run_ncrf_parallel.py",
-#                 "--reads", reads_fn,
-#                 "-t", "50",
-#                 "--outdir", ncrf_outdir,
-#                 "--repeat", unit_fn]
-#     print(" ".join(ncrf_cmd))
-#     subprocess.call(ncrf_cmd)
-#     ncrf_fn=os.path.join(ncrf_outdir, "report.ncrf")
-#
-#     # Run k-mer recruitment
-#     recr_outdir=os.path.join(outdir, "recruited_unique_kmers")
-#     recr_cmd=["python", "-u", f"{SCRIPT_DIR}/distance_based_kmer_recruitment.py",
-#                 "--ncrf", ncrf_fn,
-#                 "--coverage", str(int(32 * pread * read_reduction)),
-#                 "--min-coverage", "4",
-#                 "--outdir", recr_outdir]
-#     print(" ".join(recr_cmd))
-#     subprocess.call(recr_cmd)
-#     kmers_fn=os.path.join(recr_outdir, "unique_kmers_min_edge_cov_4.txt")
-#
-#     # Run read placer
-#     placer_outdir=os.path.join(outdir, "tr_resolution")
-#     placer_cmd=["python", "-u", f"{SCRIPT_DIR}/read_placer.py",
-#                   "--ncrf", ncrf_fn,
-#                   "--genomic-kmers", kmers_fn,
-#                   "--outdir", placer_outdir]
-#     print(" ".join(placer_cmd))
-#     subprocess.call(placer_cmd)
-#     read_pos_fn=os.path.join(placer_outdir, "read_positions.csv")
-#
-#     # Run ELTR polisher
-#     polisher_outdir=os.path.join(outdir, "polishing")
-#     polisher_cmd=["python", "-u", f"{SCRIPT_DIR}/eltr_polisher.py",
-#                     "--read-placement", read_pos_fn,
-#                     "--outdir", polisher_outdir,
-#                     "--ncrf", ncrf_fn,
-#                     "--output-progress",
-#                     "--error-mode", "nano",
-#                     "--num-iters", "4",
-#                     "--num-threads", "50",
-#                     "--unit", unit_fn]
-#     print(" ".join(polisher_cmd))
-#     subprocess.call(polisher_cmd)
-
-
 class CentroFlye:
     def __init__(self, params):
         self.params = params
+        MAIN_DIR = os.path.dirname(os.path.realpath(__file__))
+        SCRIPTS_DIR = os.path.join(MAIN_DIR, 'scripts')
+        self.ncrf_script = os.path.join(SCRIPTS_DIR, "run_ncrf_parallel.py")
+        self.recr_script = os.path.join(SCRIPTS_DIR,
+                                        "distance_based_kmer_recruitment.py")
+        self.placer_script = os.path.join(SCRIPTS_DIR, "read_placer.py")
+        self.polisher_script = os.path.join(SCRIPTS_DIR, "eltr_polisher.py")
 
     def run_NCRF(self):
-        ncrf_outdir=os.path.join(self.params.outdir, "NCRF_rc")
-        # ncrf_cmd=["python", "-u", f"{SCRIPT_DIR}/run_ncrf_parallel.py",
-        #             "--reads", reads_fn,
-        #             "-t", "50",
-        #             "--outdir", ncrf_outdir,
-        #             "--repeat", unit_fn]
-        # print(" ".join(ncrf_cmd))
-        # subprocess.call(ncrf_cmd)
-        # ncrf_fn=os.path.join(ncrf_outdir, "report.ncrf")
-        # return ncrf_fn
+        ncrf_outdir = os.path.join(self.params.outdir, "NCRF")
+        ncrf_cmd = ["python", "-u", self.ncrf_script,
+                    "--reads", self.params.reads,
+                    "--threads", self.params.threads,
+                    "--outdir", ncrf_outdir,
+                    "--repeat", self.params.unit]
+        ncrf_cmd = listEls2str(ncrf_cmd)
+        print('Running NCRF:')
+        print(list2str(ncrf_cmd))
+        subprocess.call(ncrf_cmd)
+        ncrf_fn = os.path.join(ncrf_outdir, "report.ncrf")
+        return ncrf_fn
+
+    def run_kmer_recr(self, ncrf_fn):
+        recr_outdir = os.path.join(self.params.outdir,
+                                   "recruited_unique_kmers")
+        recr_cmd = ["python", "-u", self.recr_script,
+                    "--ncrf", ncrf_fn,
+                    "--coverage", self.params.coverage,
+                    "--min-coverage", self.params.min_coverage,
+                    "--outdir", recr_outdir,
+                    "--min-nreads", self.params.min_nreads,
+                    "--max-nreads", self.params.max_nreads,
+                    "--min-distance", self.params.min_distance,
+                    "--max-distance", self.params.max_distance,
+                    "--bottom", self.params.bottom,
+                    "--top", self.params.top,
+                    "--kmer-survival-rate", self.params.kmer_survival_rate,
+                    "--max-nonuniq", self.params.max_nonuniq]
+        recr_cmd = listEls2str(recr_cmd)
+        print("Running unique kmer recruitment")
+        print(list2str(recr_cmd))
+        subprocess.call(recr_cmd)
+        kmers_fn = os.path.join(
+            recr_outdir,
+            f"unique_kmers_min_edge_cov_{self.params.min_coverage}.txt")
+        return kmers_fn
+
+    def run_read_placer(self, ncrf_fn, kmers_fn):
+        placer_outdir = os.path.join(self.params.outdir, "tr_resolution")
+        placer_cmd = ["python", "-u", self.placer_script,
+                      "--ncrf", ncrf_fn,
+                      "--genomic-kmers", kmers_fn,
+                      "--outdir", placer_outdir,
+                      "--n-motif", self.params.n_motif,
+                      "--min-cloud-kmer-freq", self.params.min_cloud_kmer_freq,
+                      "--min-kmer-mult", self.params.min_kmer_mult,
+                      "--min-unit", self.params.min_unit,
+                      "--min-inters", self.params.min_inters]
+        placer_cmd = listEls2str(placer_cmd)
+        print("Running tandem repeat resolution")
+        print(list2str(placer_cmd))
+        subprocess.call(placer_cmd)
+        read_pos_fn = os.path.join(placer_outdir, "read_positions.csv")
+        return read_pos_fn
+
+    def run_polisher(self, ncrf_fn, read_pos_fn):
+        polisher_outdir = os.path.join(self.params.outdir, "polishing")
+        polisher_cmd = ["python", "-u", self.polisher_script,
+                        "--read-placement", read_pos_fn,
+                        "--outdir", polisher_outdir,
+                        "--ncrf", ncrf_fn,
+                        "--output-progress",
+                        "--error-mode", self.params.error_mode,
+                        "--num-iters", self.params.num_polish_iters,
+                        "--num-threads", self.params.threads,
+                        "--unit", self.params.unit,
+                        "--min-pos", self.params.min_pos]
+        if self.params.max_pos != math.inf:
+            polisher_cmd.append("--max-pos")
+            polisher_cmd.append(self.params.max_pos)
+        polisher_cmd = listEls2str(polisher_cmd)
+        print("Running polishing")
+        print(list2str(polisher_cmd))
+        subprocess.call(polisher_cmd)
 
     def run(self):
-        all_reads = read_bio_seqs(self.params.reads)
         smart_makedirs(self.params.outdir)
+        ncrf_fn = self.run_NCRF()
+        kmers_fn = self.run_kmer_recr(ncrf_fn)
+        read_pos_fn = self.run_read_placer(ncrf_fn=ncrf_fn, kmers_fn=kmers_fn)
+        self.run_polisher(ncrf_fn=ncrf_fn, read_pos_fn=read_pos_fn)
 
 
 def main():

@@ -78,3 +78,11 @@ def get_kmers(fn):
         for line in f:
             kmers.append(line.strip())
     return set(kmers)
+
+
+def list2str(lst, sep=' '):
+    return sep.join(str(e) for e in lst)
+
+
+def listEls2str(lst):
+    return [str(e) for e in lst]
