@@ -82,8 +82,8 @@ def main():
 
     # Manual connection of two scaffolds for cen6
     # TODO
-    cen6_scaffold = scaffolds[1] + scaffolds[0][db.k-1:]
-    cen6_edge_scaffold = edge_scaffolds[1] + edge_scaffolds[0]
+    cen6_scaffold = scaffolds[0] + scaffolds[1][db.k-1:]
+    cen6_edge_scaffold = edge_scaffolds[0] + edge_scaffolds[1]
 
     print('Mapping reads to scaffolds')
     r2s = read2scaffolds(db, [cen6_edge_scaffold], mappings, ec_monostrings)
