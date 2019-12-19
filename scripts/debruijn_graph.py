@@ -345,7 +345,7 @@ def iterative_graph(monostrings, min_k, max_k, outdir,
         db.add_kmers(frequent_kmers, coverage=frequent_kmers)
 
         db.collapse_nonbranching_paths()
-        if nx.number_weakly_connected_components(db.graph) > 1:
+        if verbose and nx.number_weakly_connected_components(db.graph) > 1:
             print(f'#cc = {nx.number_weakly_connected_components(db.graph)}')
             for cc in nx.weakly_connected_components(db.graph):
                 print(len(cc))
@@ -399,6 +399,9 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
 
     def build_scaffold_graph(connections):
         scaffold_graph = nx.DiGraph()
+        for long_edge in db.get_long_edges():
+            scaffold_graph.add_node(long_edge)
+
         for (e1, e2), connection_counts in connections.items():
             n_support_connections = sum(connection_counts.values())
             if n_support_connections >= min_connections:
@@ -412,13 +415,8 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
             cc_sg = scaffold_graph.subgraph(cc)
             if nx.is_directed_acyclic_graph(cc_sg):
                 top_sort = list(nx.topological_sort(cc_sg))
-                is_list = True
-                for e1, e2 in zip(top_sort[:-1], top_sort[1:]):
-                    if (e1, e2) not in cc_sg.edges():
-                        is_list = False
-                        break
-                if is_list:
-                    longedge_scaffolds.append(top_sort)
+                longest_path = nx.dag_longest_path(cc_sg)
+                longedge_scaffolds.append(longest_path)
         return longedge_scaffolds
 
     def get_longest_extensions(longedge_scaffold):
@@ -475,7 +473,7 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
     #     print(e1, e2)
     #     print(connections[(e1, e2)])
     scaffold_graph = build_scaffold_graph(connections)
-    # nx.drawing.nx_pydot.write_dot(scaffold_graph, 'scaffold graph.dot')
+    nx.drawing.nx_pydot.write_dot(scaffold_graph, 'scaffold_graph.dot')
     longedge_scaffolds = select_lists(scaffold_graph)
     edge_scaffolds = get_edge_scaffolds(longedge_scaffolds,
                                         connections)
