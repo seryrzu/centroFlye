@@ -81,11 +81,10 @@ bash scripts/read_recruitment/run_read_recruitment.sh \
 + RAM: < 50MB
 
 ### 2. Applying centroFlye to centromere X reads
-At this step we are utilizing centromeric reads from step 1 and run NCRF on them.
-The result of this step is the NCRF report on all centromeric reads that is stored at `results/NCRF_rc/report.ncrf`.
+At this step we are utilizing centromeric reads from step 1 and run centroFlye on them.
+The result of this step is the final cenX assembly that is stored at `results/final_assembly.fasta`.
 The following command uses 50 threads.
 
-If NCRF binary is not in your `PATH` please specify `--ncrf-bin <path_to_NCRF>`.
 ```
 python centroFlye.py \
             --reads results/centromeric_reads/centromeric_reads.fasta \
