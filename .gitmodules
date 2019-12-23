@@ -1,0 +1,3 @@
+[submodule "scripts/ext/tandemQUAST"]
+	path = scripts/ext/tandemQUAST
+	url = git@github.com:ablab/tandemQUAST.git
