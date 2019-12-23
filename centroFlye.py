@@ -103,6 +103,12 @@ def parse_args():
                              default=10,
                              type=int)
 
+    # unit consensus
+    unit_cons_args = parser.add_argument_group("Unit consensus reconstruction")
+    unit_cons_args.add_argument("--cons-k-mer-len",
+                                help="Length of frequent k-mer",
+                                default=30,
+                                type=int)
     # Polisher
     polisher_args = parser.add_argument_group("Polisher")
     polisher_args.add_argument("--flye-bin",
@@ -140,6 +146,9 @@ class CentroFlye:
         self.recr_script = os.path.join(SCRIPTS_DIR,
                                         "distance_based_kmer_recruitment.py")
         self.placer_script = os.path.join(SCRIPTS_DIR, "read_placer.py")
+        self.unit_reconstructor = \
+            os.path.join(SCRIPTS_DIR,
+                         "better_consensus_unit_reconstruction.py")
         self.polisher_script = os.path.join(SCRIPTS_DIR, "eltr_polisher.py")
         self.tandemPolisher = os.path.join(SCRIPTS_DIR,
                                            "ext",
@@ -203,7 +212,22 @@ class CentroFlye:
         read_pos_fn = os.path.join(placer_outdir, "read_positions.csv")
         return read_pos_fn
 
-    def run_polisher(self, ncrf_fn, read_pos_fn):
+    def run_unit_reconstructor(self, ncrf_fn):
+        unit_star_fn = os.path.join(self.params.outdir,
+                                    'cons_unit',
+                                    'unit_star.fasta')
+        unit_star_cmd = ["python", "-u", self.unit_reconstructor,
+                         "--reads-ncrf", ncrf_fn,
+                         "--unit", self.params.unit,
+                         "-k", self.params.cons_k_mer_len,
+                         "--output", unit_star_fn]
+        unit_star_cmd = listEls2str(unit_star_cmd)
+        print("Running unit star reconstruction")
+        print(list2str(unit_star_cmd))
+        subprocess.call(unit_star_cmd)
+        return unit_star_fn
+
+    def run_polisher(self, ncrf_fn, read_pos_fn, unit_star_fn):
         polisher_outdir = os.path.join(self.params.outdir, "polishing1")
         polisher_cmd = ["python", "-u", self.polisher_script,
                         "--read-placement", read_pos_fn,
@@ -213,7 +237,7 @@ class CentroFlye:
                         "--error-mode", self.params.error_mode,
                         "--num-iters", self.params.num_polish_iters,
                         "--num-threads", self.params.threads,
-                        "--unit", self.params.unit,
+                        "--unit", unit_star_fn,
                         "--min-pos", self.params.min_pos]
         if self.params.max_pos != math.inf:
             polisher_cmd.append("--max-pos")
@@ -256,8 +280,10 @@ class CentroFlye:
         ncrf_fn = self.run_NCRF()
         kmers_fn = self.run_kmer_recr(ncrf_fn)
         read_pos_fn = self.run_read_placer(ncrf_fn=ncrf_fn, kmers_fn=kmers_fn)
+        unit_star_fn = self.run_unit_reconstructor(ncrf_fn=ncrf_fn)
         assembly_fn = self.run_polisher(ncrf_fn=ncrf_fn,
-                                        read_pos_fn=read_pos_fn)
+                                        read_pos_fn=read_pos_fn,
+                                        unit_star_fn=unit_star_fn)
         polished_assembly_fn = self.run_tandemPolisher(assembly_fn=assembly_fn)
         self.copy_final_assembly(polished_assembly_fn)
 
