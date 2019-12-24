@@ -119,11 +119,8 @@ def parse_args():
                                default="pacbio")
     polisher_args.add_argument("--num-polish-iters",
                                help='Number of iterations',
-                               default=2,
+                               default=4,
                                type=int)
-    polisher_args.add_argument("--output-progress",
-                               help='Output progress of polisher',
-                               action='store_false')
     polisher_args.add_argument("--min-pos",
                                help='Min position unit to polish',
                                type=int,
@@ -233,7 +230,6 @@ class CentroFlye:
                         "--read-placement", read_pos_fn,
                         "--outdir", polisher_outdir,
                         "--ncrf", ncrf_fn,
-                        "--output-progress",
                         "--error-mode", self.params.error_mode,
                         "--num-iters", self.params.num_polish_iters,
                         "--num-threads", self.params.threads,
