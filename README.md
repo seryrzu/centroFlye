@@ -20,7 +20,7 @@ Here we show how to apply it for the centromere X of the CHM13hTERT human cell l
 + [Regex](https://pypi.org/project/regex/)
 
 ### External software
-+ [Flye](https://github.com/fenderglass/Flye) (*v2.6*, tested on commit: `47548b89cc469501b3564bc3d1b5743039119f6c`)
++ [Flye](https://github.com/fenderglass/Flye) (*v2.5*, tested on commit: `315122d2ff58025aa4c38227239f431490b557ac`)
 + [Noise Cancelling Repeat Finder (NCRF)](https://github.com/makovalab-psu/NoiseCancellingRepeatFinder) (Tested on commit : `758206f1689ad1338cf7a841482dbf12548c337a`)
 
 Please note that all external software by default has to be in your `PATH`.
