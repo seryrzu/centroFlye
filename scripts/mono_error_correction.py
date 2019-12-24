@@ -5,7 +5,7 @@ import numpy as np
 
 from utils.bio import hamming_distance, min_cyclic_shift
 from debruijn_graph import DeBruijnGraph, get_frequent_kmers
-from sd_parser_83640e3 import get_stats
+from sd_parser import get_stats
 
 
 def get_ma(x, N):

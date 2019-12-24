@@ -4,20 +4,17 @@ import os
 from debruijn_graph import iterative_graph, scaffolding, read2scaffolds,\
                            cover_scaffolds_w_reads, extract_read_pseudounits, \
                            polish
-from sd_parser_83640e3 import SD_Report
+from sd_parser import SD_Report
 from mono_error_correction import error_correction
 
 from utils.os_utils import smart_makedirs
 from utils.bio import read_bio_seqs
 
 
-SD_version = 83640e3
-
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--sd-report',
-                        help='Path to SD report (v.{SD_version})',
+                        help='Path to SD report',
                         required=True)
     parser.add_argument('--monomers',
                         help='Path to fasta with monomers used to call SD',
