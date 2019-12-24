@@ -116,7 +116,7 @@ def parse_args():
                                default='flye')
     polisher_args.add_argument("--error-mode",
                                help='Error mode: nano/pacbio',
-                               default="pacbio")
+                               default="nano")
     polisher_args.add_argument("--num-polish-iters",
                                help='Number of iterations',
                                default=4,
