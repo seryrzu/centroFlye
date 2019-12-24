@@ -81,32 +81,36 @@ class DeBruijnGraph:
                     self.graph.remove_node(node)
 
     def purify_graph(self):
+        coverages = get_coverage(self.graph)
         first_edge = None
-        for edge in self.graph.edges:
+        for (edge, e_cov) in sorted(coverages.items(),
+                                    key=lambda x: (-x[1], x[0])):
             if self.graph.out_degree(edge[0]) == 1 \
                     and self.graph.in_degree(edge[1]) == 1:
                 first_edge = edge
                 break
-        assert first_edge is not None
+
         first_edge_properties = self.graph.edges[first_edge]
         self.graph.remove_edge(*first_edge)
 
         while True:
             coverages = get_coverage(self.graph)
-            min_coverage = np.inf
-            edges = list(self.graph.edges)
             edge2remove = None
-            for edge in edges:
+            for (edge, e_cov) in sorted(coverages.items(),
+                                        key=lambda x: (x[1], x[0])):
                 gr = self.graph.copy()
                 gr.remove_edge(*edge)
                 if nx.is_weakly_connected(gr):
-                    if coverages[edge] < min_coverage:
-                        edge2remove = edge
-                        min_coverage = coverages[edge]
+                    edge2remove = edge
+                    break
+
             if edge2remove is not None:
                 self.graph.remove_edge(*edge2remove)
                 assert nx.is_weakly_connected(self.graph)
                 self.graph.remove_nodes_from(list(nx.isolates(self.graph)))
+                assert nx.is_weakly_connected(self.graph)
+                self.collapse_nonbranching_paths(respect_color=False)
+                assert nx.is_weakly_connected(self.graph)
             else:
                 break
 
@@ -155,9 +159,10 @@ def get_most_frequent_kmers(reads_ncrf_report, k, unit_seq):
     unit_kmers = \
         set(unit_double_seq[i:i+k] for i in range(len(unit_seq)))
 
-    most_frequent_kmers = heapq.nlargest(n=int(len(unit_kmers)*3),
-                                         iterable=kmer_counts_reads,
-                                         key=kmer_counts_reads.get)
+    most_frequent_kmers = \
+        heapq.nlargest(n=int(len(unit_kmers)*3),
+                       iterable=kmer_counts_reads,
+                       key=lambda kmer: (kmer_counts_reads[kmer], kmer))
     most_frequent_kmers = set(most_frequent_kmers)
     return kmer_counts_reads, most_frequent_kmers
 
@@ -165,17 +170,15 @@ def get_most_frequent_kmers(reads_ncrf_report, k, unit_seq):
 def get_polished_unit(k, most_frequent_kmers, kmer_counts_reads, unit_seq):
     debr = DeBruijnGraph(k=k)
     debr.add_kmers(most_frequent_kmers, 'red', kmer_counts_reads)
-    debr.collapse_nonbranching_paths()
+    debr.collapse_nonbranching_paths() #otherwise on next step can delete lists
     debr.remove_tips()
     debr.collapse_nonbranching_paths()
     debr.purify_graph()
 
-    edge = list(debr.graph.edges)[0]
+    edges = sorted(list(debr.graph.edges))
+    edge = edges[0]
     new_unit = debr.graph.edges[edge]['edge_kmer']
-    trim = 1
-    while new_unit[:trim] != new_unit[-trim:]:
-        trim += 1
-    new_unit = new_unit[:-trim]
+    new_unit = new_unit[:-(k-1)]
 
     doubled_unit = new_unit + new_unit
     alignment = \
@@ -192,8 +195,9 @@ def main():
     outdir = os.path.dirname(params.output)
     smart_makedirs(outdir)
 
-    reads_ncrf_report = NCRF_Report(params.reads_ncrf)
     unit_seq = read_bio_seq(params.unit)
+
+    reads_ncrf_report = NCRF_Report(params.reads_ncrf)
 
     kmer_counts_reads, most_frequent_kmers = \
         get_most_frequent_kmers(reads_ncrf_report,
@@ -205,7 +209,7 @@ def main():
                                  kmer_counts_reads=kmer_counts_reads,
                                  unit_seq=unit_seq)
 
-    write_bio_seqs(params.output, {'DXZ1*': new_unit})
+    write_bio_seqs(params.output, {'unit*': new_unit})
 
 
 if __name__ == "__main__":
