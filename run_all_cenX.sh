@@ -15,7 +15,7 @@ ${BASH_SOURCE%/*}/scripts/read_recruitment/run_read_recruitment.sh \
     ${OUTPUT}/centromeric_reads ${THREADS} 11100000
 
 python ${BASH_SOURCE%/*}/centroFlye.py \
-    --coverage 32
+    --coverage 32 \
     --reads ${OUTPUT}/centromeric_reads/centromeric_reads.fasta \
     -t ${THREADS} \
     --outdir ${OUTPUT} \
