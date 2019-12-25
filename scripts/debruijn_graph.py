@@ -1,3 +1,7 @@
+# (c) 2019 by Authors
+# This file is a part of centroFlye program.
+# Released under the BSD license (see LICENSE file)
+
 from collections import defaultdict, Counter
 from itertools import groupby
 import os
