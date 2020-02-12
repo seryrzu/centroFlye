@@ -175,7 +175,10 @@ class SD_Report:
                          header=None,
                          names=['r_id', 'monomer',
                                 'r_st', 'r_en',
-                                'score',
+                                'identity',
+                                'sec_monomer', 'sec_identity',
+                                'homo_monomer', 'homo_identity',
+                                'sec_homo_monomer', 'sec_homo_identity',
                                 'reliability'
                                 ])
         df.monomer = df.monomer.apply(lambda x: self.monomer_names_map[x])
@@ -235,7 +238,7 @@ def main():
                         required=True)
     params = parser.parse_args()
     sd_report = SD_Report(params.input, params.monomers)
-    get_stats(monostrings=sd_report.get_monomer_strings(),
+    get_stats(monostrings=sd_report.monostrings,
               verbose=True, return_stats=False)
 
 
