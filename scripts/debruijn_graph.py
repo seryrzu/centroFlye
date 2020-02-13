@@ -3,6 +3,7 @@
 # Released under the BSD license (see LICENSE file)
 
 from collections import defaultdict, Counter
+from copy import deepcopy
 from itertools import groupby
 import os
 import subprocess
@@ -321,7 +322,7 @@ def get_frequent_kmers(strings, k, min_mult=5):
 def iterative_graph(monostrings, min_k, max_k, outdir,
                     min_mult=5, step=1, starting_graph=None, verbose=True):
     smart_makedirs(outdir)
-    dbs, all_contigs = {}, {}
+    dbs, uncompr_dbs, all_contigs = {}, {}, {}
     all_frequent_kmers, all_frequent_kmers_read_pos = {}, {}
     strings = {k: ''.join(v.string) for k, v in monostrings.items()}
     input_strings = strings.copy()
@@ -347,7 +348,8 @@ def iterative_graph(monostrings, min_k, max_k, outdir,
 
         db = DeBruijnGraph(k=k)
         db.add_kmers(frequent_kmers, coverage=frequent_kmers)
-
+        uncompr_dbs[k] = deepcopy(db)
+        
         db.collapse_nonbranching_paths()
         if verbose and nx.number_weakly_connected_components(db.graph) > 1:
             print(f'#cc = {nx.number_weakly_connected_components(db.graph)}')
@@ -371,7 +373,7 @@ def iterative_graph(monostrings, min_k, max_k, outdir,
 
         complex_kp1mers = get_paths_thru_complex_nodes(db, strings)
 
-    return all_contigs, dbs, all_frequent_kmers, all_frequent_kmers_read_pos
+    return all_contigs, dbs, uncompr_dbs, all_frequent_kmers, all_frequent_kmers_read_pos
 
 
 def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
