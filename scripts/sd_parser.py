@@ -6,6 +6,7 @@ import argparse
 from collections import Counter
 from string import ascii_uppercase, ascii_lowercase
 
+from scipy.stats import binom_test
 import numpy as np
 import pandas as pd
 
@@ -155,6 +156,82 @@ class MonoString:
         return resulting_monostrings
 
 
+def ident_hybrids(df, monomer_names_map, 
+                  max_ident_diff=0.5, min_occ=500):
+    def count_pairs(df):
+        pairs = []
+        for m1, m2, rel in df[['monomer',
+                               'sec_monomer',
+                               'reliability']].to_numpy():
+            if rel == '+':
+                m1, m2 = m1.upper(), m2.upper()
+                m1, m2 = min(m1, m2), max(m1, m2)
+                pairs.append((m1, m2))
+        cnt = Counter(pairs)
+        return cnt
+    
+    def get_med_pair_p(all_cnt, pairing_cnt, min_occ=min_occ):
+        ps = [pairing_cnt[pair] / all_cnt[pair]
+              for pair in all_cnt.keys()
+              if all_cnt[pair] >= min_occ]
+        return np.median(ps)
+    
+    def recr_sign_pairs(all_cnt, pairing_cnt, med_pair_p,
+                        alpha=0.05, min_occ=min_occ):
+        pairs = []
+        for pair, ac in all_cnt.items():
+            
+            if ac < min_occ:
+                continue
+            pc = pairing_cnt[pair]
+            pv = binom_test(pc, ac, p=med_pair_p, alternative='greater')
+            
+            if pv * len(all_cnt) < alpha:
+                pairs.append((pv, pair))
+        pairs.sort()
+        
+        max_char = max(monomer_names_map.values())
+        max_index = ascii_lowercase.index(max_char)
+        left_letters = len(ascii_lowercase) - max_index
+        
+        pairs = [pair for (pv, pair) in pairs[:left_letters]]
+        return pairs
+    
+    def get_pair2char(pairs):
+        pair2char = {}
+        lower_alphabet, upper_alphabet = list(ascii_lowercase), list(ascii_uppercase)
+        max_char = max(monomer_names_map.values())
+        index = lower_alphabet.index(max_char) + 1
+        for pair in pairs:
+            pair2char[pair] = upper_alphabet[index]
+            pair2char[pair[::-1]] = upper_alphabet[index]
+
+            lower_pair = (pair[0].lower(), pair[1].lower())
+            pair2char[lower_pair] = lower_alphabet[index]
+            pair2char[lower_pair[::-1]] = lower_alphabet[index]
+            index += 1
+        return pair2char
+    
+    def transform_df(df_pairing, pair2char):
+        for i, row in df_pairing.iterrows():
+            pair = (row.monomer, row.sec_monomer)
+            if pair in pair2char:
+                df.at[i, 'monomer'] = pair2char[pair]
+        return df
+    
+    all_cnt = count_pairs(df)
+    close_identity = (abs(df.identity - df.sec_identity) < max_ident_diff) & (df.reliability == '+')
+    pairing = close_identity
+    df_pairing = df[pairing]
+    pairing_cnt = count_pairs(df_pairing)
+    med_pair_p = get_med_pair_p(all_cnt, pairing_cnt)
+    pairs = recr_sign_pairs(all_cnt, pairing_cnt, med_pair_p)
+    pair2char = get_pair2char(pairs)
+    
+    transformed_df = transform_df(df[pairing], pair2char)
+    return transformed_df, pair2char
+    
+
 class SD_Report:
     def __init__(self, SD_report_fn, monomers_fn, max_gap=100, gap_symb='?'):
         self.gap_symb = gap_symb
@@ -182,8 +259,11 @@ class SD_Report:
                                 'reliability'
                                 ])
         df.monomer = df.monomer.apply(lambda x: self.monomer_names_map[x])
-        df = df.groupby('r_id')
-        for r_id, group in df:
+        df.sec_monomer = df.sec_monomer.apply(lambda x: self.monomer_names_map[x])
+        
+        df, self.pair2char = ident_hybrids(df, monomer_names_map=self.monomer_names_map)
+        
+        for r_id, group in df.groupby('r_id'):
             self.monostrings[r_id] = \
                 MonoString.FromSDRecord(name=r_id,
                                         monomers=group.monomer.to_list(),
@@ -193,6 +273,7 @@ class SD_Report:
                                         max_gap=max_gap,
                                         mean_monomer_len=mean_monomer_len,
                                         gap_symb=self.gap_symb)
+        self.df = df
 
 
 def get_ngap_symbols(monostrings, compr_hmp=False, gap_symb='?'):
