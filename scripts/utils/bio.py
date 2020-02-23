@@ -5,7 +5,14 @@
 from Bio import SeqIO
 import numpy as np
 from itertools import groupby
+import os
 import re
+
+from joblib import Parallel, delayed
+from utils.various import weighted_random_by_dct
+
+
+script_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 def read_bio_seq(filename):
@@ -25,6 +32,8 @@ def read_bio_seqs(filename):
 
 
 trans = str.maketrans('ATGCatgc-', 'TACGtacg-')
+
+
 def RC(s):
     return s.translate(trans)[::-1]
 
@@ -192,3 +201,77 @@ def min_cyclic_shift(s):
     ds = s + s
     min_shift = min(ds[i:i+len(s)] for i in range(len(s)))
     return min_shift
+
+
+# from https://stackoverflow.com/a/40927266
+def weighted_random_by_dct(dct):
+    rand_val = np.random.random()
+    total = 0
+    for k, v in dct.items():
+        total += v
+        if rand_val <= total:
+            return k
+    assert False, 'unreachable'
+
+
+def get_mut_config(data_type):
+    if data_type == 'pacbio':
+        config_fn = os.path.join(script_dir, '..', '..',
+                                 'config', 'pacbio_substitutions.mat')
+    elif data_type == 'nano':
+        config_fn = os.path.join(script_dir, '..', '..',
+                                 'config', 'nano_r94_substitutions.mat')
+    else:
+        assert False, f'Unknown: {data_type}. "pacbio"/"nano are supported'
+
+    subst = {b: {} for b in list("ACGT")}
+    ins = {}
+
+    with open(config_fn) as f:
+        for line in f:
+            line = line.strip().split('\t')
+            action = line[0]
+            if action == 'mat':
+                b, p = line[1], float(line[2])
+                subst[b][b] = p
+            elif action == 'mis':
+                p = line[2]
+                (s, e), p = line[1].split('->'), float(p)
+                subst[s][e] = p
+            elif action == 'del':
+                b, p = line[1], float(line[2])
+                subst[b][''] = p
+            elif action == 'ins':
+                b, p = line[1], float(line[2])
+                ins[b] = p
+            elif action == 'noins':
+                p = float(line[1])
+                ins[''] = p
+    return subst, ins
+
+
+def __mutate_seq(seq, subst, ins):
+    mut = []
+    for b in seq:
+        ins_b = weighted_random_by_dct(ins)
+        mut.append(ins_b)
+        mut_b = weighted_random_by_dct(subst[b])
+        mut.append(mut_b)
+    mut = ''.join(mut)
+    return mut
+
+
+def mutate_seq(seq, data_type, N=1, t=16):
+    subst, ins = get_mut_config(data_type)
+
+    if N < 100:
+        mut_seqs = []
+        for i in range(N):
+            mut_seqs.append(__mutate_seq(seq, subst, ins))
+    else:
+        mut_seqs = Parallel(n_jobs=t) \
+            (delayed(__mutate_seq)(seq, subst, ins) for i in range(N))
+
+    if N == 1:
+        return mut_seqs[0]
+    return mut_seqs

@@ -86,3 +86,14 @@ def list2str(lst, sep=' '):
 
 def listEls2str(lst):
     return [str(e) for e in lst]
+
+
+# from https://stackoverflow.com/a/40927266
+def weighted_random_by_dct(dct):
+    rand_val = np.random.random()
+    total = 0
+    for k, v in dct.items():
+        total += v
+        if rand_val <= total:
+            return k
+    assert False, 'unreachable'
