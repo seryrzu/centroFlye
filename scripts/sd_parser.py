@@ -157,7 +157,7 @@ class MonoString:
 
 
 def ident_hybrids(df, monomer_names_map, 
-                  max_ident_diff=0.5, min_occ=500):
+                  max_ident_diff=5, min_occ=500):
     def count_pairs(df):
         pairs = []
         for m1, m2, rel in df[['monomer',
@@ -177,16 +177,16 @@ def ident_hybrids(df, monomer_names_map,
         return np.median(ps)
     
     def recr_sign_pairs(all_cnt, pairing_cnt, med_pair_p,
-                        alpha=0.05, min_occ=min_occ):
+                        alpha=0.05, min_occ=min_occ, min_pc=5):
         pairs = []
         for pair, ac in all_cnt.items():
-            
-            if ac < min_occ:
-                continue
             pc = pairing_cnt[pair]
+            if ac < min_occ or pc < min_pc:
+                continue
             pv = binom_test(pc, ac, p=med_pair_p, alternative='greater')
             
             if pv * len(all_cnt) < alpha:
+                print(pv, ac, pc, pair)
                 pairs.append((pv, pair))
         pairs.sort()
         
@@ -194,6 +194,7 @@ def ident_hybrids(df, monomer_names_map,
         max_index = ascii_lowercase.index(max_char)
         left_letters = len(ascii_lowercase) - max_index
         
+        print(pairs)
         pairs = [pair for (pv, pair) in pairs[:left_letters]]
         return pairs
     
@@ -233,7 +234,10 @@ def ident_hybrids(df, monomer_names_map,
     
 
 class SD_Report:
-    def __init__(self, SD_report_fn, monomers_fn, max_gap=100, gap_symb='?'):
+    def __init__(self, SD_report_fn, monomers_fn,
+                 max_gap=100,
+                 gap_symb='?',
+                 ident_hybrid=True):
         self.gap_symb = gap_symb
         monomers = read_bio_seqs(monomers_fn)
         mean_monomer_len = \
@@ -261,8 +265,11 @@ class SD_Report:
         df.monomer = df.monomer.apply(lambda x: self.monomer_names_map[x])
         df.sec_monomer = df.sec_monomer.apply(lambda x: self.monomer_names_map[x])
         
-        df, self.pair2char = ident_hybrids(df, monomer_names_map=self.monomer_names_map)
-        
+        if ident_hybrid:
+            df, self.pair2char = ident_hybrids(df, monomer_names_map=self.monomer_names_map)
+        else:
+            self.pair2char = None
+
         for r_id, group in df.groupby('r_id'):
             self.monostrings[r_id] = \
                 MonoString.FromSDRecord(name=r_id,
