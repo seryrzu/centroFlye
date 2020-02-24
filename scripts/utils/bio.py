@@ -4,6 +4,7 @@
 
 from Bio import SeqIO
 import numpy as np
+import edlib
 from itertools import groupby
 import os
 import re
@@ -275,3 +276,195 @@ def mutate_seq(seq, data_type, N=1, t=16):
     if N == 1:
         return mut_seqs[0]
     return mut_seqs
+
+
+def hybrid_alignment(r, a, b, mism=-1, match=1, indel=-1):
+
+    def dp(r, a, b, lr, la, lb):
+        ra = np.zeros((lr, la))
+        rb = np.zeros((lr, lb))
+        rap = np.zeros((lr, la), dtype=tuple)
+        rbp = np.zeros((lr, lb), dtype=tuple)
+
+        # matrix ra
+        ## initialize 0th column
+        for i in range(1, lr):
+            ra[i, 0] = ra[i-1, 0] + indel
+        ## initialize 0th row
+        for j in range(1, la):
+            ra[0, j] = ra[0, j-1] + indel
+        ## main dp for ra
+        for i in range(1, lr):
+            for j in range(1, la):
+                diag = ra[i-1, j-1] + match if r[i] == a[j] else mism
+                vert = ra[i-1, j] + indel
+                horz = ra[i, j-1] + indel
+
+                score = max(diag, vert, horz)
+                if diag == score:
+                    ra[i, j] = diag
+                    rap[i, j] = (i-1, j-1)
+                elif vert == score:
+                    ra[i, j] = vert
+                    rap[i, j] = (i-1, j)
+                elif horz == score:
+                    ra[i, j] = horz
+                    rap[i, j] = (i, j-1)
+                else:
+                    assert False
+
+        # matrix rb
+        ## initialize 0th column
+        for i in range(1, lr):
+            rb[i, 0] = rb[i-1, 0] + indel
+            rbp[i, 0] = (1, i-1, 0)
+            for j in range(0, la):
+                jump = ra[i, j]
+                if jump > rb[i, 0]:
+                    rb[i, 0] = jump
+                    rbp[i, 0] = (0, i, j)
+        ## initialize 0th row
+        for j in range(0, lb):
+            rbp[0, j] = (0, 0, 0)
+        ## main dp for rb
+        for i in range(1, lr):
+            for j in range(1, lb):
+                best_jump = -1
+                for k in range(0, la):
+                    jump = ra[i, k]
+                    if jump > best_jump:
+                        best_jump = jump
+                        rbp[i, j] = (0, i, k)
+                rb[i, j] = best_jump
+
+                diag = rb[i-1, j-1] + match if r[i] == b[j] else mism
+                vert = rb[i-1, j] + indel
+                horz = rb[i, j-1] + indel
+                score = max(rb[i, j], diag, vert, horz)
+
+                if diag == score:
+                    rb[i, j] = diag
+                    rbp[i, j] = (1, i-1, j-1)
+                elif vert == score:
+                    rb[i, j] = vert
+                    rbp[i, j] = (1, i-1, j)
+                elif horz == score:
+                    rb[i, j] = horz
+                    rbp[i, j] = (1, i, j-1)
+        return ra, rb, rap, rbp
+
+    # backtracking
+    def simp_back(p, m, i, j):
+        ar, am = [], []
+        while i != 0 and j != 0:
+            if p[i, j] == (i-1, j-1):
+                ar.append(r[i])
+                am.append(m[j])
+                i -= 1
+                j -= 1
+            elif p[i, j] == (i-1, j):
+                ar.append(r[i])
+                am.append('-')
+                i -= 1
+            else:
+                ar.append('-')
+                am.append(m[j])
+                j -= 1
+
+        while i != 0:
+            ar.append(r[i])
+            am.append('-')
+            i -= 1
+        while j != 0:
+            ar.append('-')
+            am.append(m[j])
+            j -= 1
+        ar.reverse()
+        am.reverse()
+        return ar, am
+
+    def jump_back(p0, p1, m0, m1, i, j):
+        ar, am = [], []
+        while i != 0 and j != 0:
+            if p1[i, j] == (1, i-1, j-1):
+                ar.append(r[i])
+                am.append(m1[j])
+                i -= 1
+                j -= 1
+            elif p1[i, j] == (1, i-1, j):
+                ar.append(r[i])
+                am.append('-')
+                i -= 1
+            elif p1[i, j] == (1, i, j-1):
+                ar.append('-')
+                am.append(m1[j])
+                j -= 1
+            elif p1[i, j][0] == 0:
+                i0, j0 = p1[i, j][1:]
+                assert i0 == i
+                ar0, am0 = simp_back(p0, m0, i0, j0)
+                ar.reverse()
+                am.reverse()
+                ar = ar0 + ar
+                am = am0 + am
+                return ar, am, (i, j, j0)
+        while i != 0:
+            if p1[i, 0][0] == 0:
+                j0 = p1[i, 0][2]
+                ar0, am0 = simp_back(p0, m0, i, j0)
+                ar.reverse()
+                am.reverse()
+                ar = ar0 + ar
+                am = am0 + am
+                return ar, am, (i, 0, j0)
+            else:
+                ar.append(r[i])
+                am.append('-')
+                i -= 1
+        return ar, am, None
+
+    lr, la, lb = len(r) + 1, len(a) + 1, len(b) + 1
+    r, a, b = ' ' + r, ' ' + a, ' ' + b
+
+    ab_ra, ab_rb, ab_rap, ab_rbp = dp(r=r, a=a, b=b, lr=lr, la=la, lb=lb)
+    ba_rb, ba_ra, ba_rbp, ba_rap = dp(r=r, a=b, b=a, lr=lr, la=lb, lb=la)
+
+    ab_a_sc, ab_b_sc = ab_ra[-1, -1], ab_rb[-1, -1]
+    ba_a_sc, ba_b_sc = ba_ra[-1, -1], ba_rb[-1, -1]
+
+    # print(f'ab_a_sc = {ab_a_sc}, ab_b_sc = {ab_b_sc}')
+    # print(f'ba_b_sc = {ba_b_sc}, ba_a_sc = {ba_a_sc}')
+
+    scores = sorted([ab_a_sc, ab_b_sc, ba_a_sc, ba_b_sc], reverse=True)
+    score, sec_score = scores[:2]
+    score = max(ab_a_sc, ab_b_sc, ba_a_sc, ba_b_sc)
+    if ab_a_sc == score:
+        alr, alm = simp_back(p=ab_rap, m=a, i=lr-1, j=la-1)
+        jump = None
+        orient = '>'
+    elif ab_b_sc == score:
+        alr, alm, jump = jump_back(p0=ab_rap, p1=ab_rbp,
+                                   m0=a, m1=b,
+                                   i=lr-1, j=lb-1)
+        orient = '>'
+    elif ba_b_sc == score:
+        alr, alm = simp_back(p=ba_rbp, m=b, i=lr-1, j=lb-1)
+        jump = None
+        orient = '<'
+    elif ba_a_sc == score:
+        alr, alm, jump = jump_back(p0=ba_rbp, p1=ba_rap,
+                                   m0=b, m1=a,
+                                   i=lr-1, j=la-1)
+        orient = '<'
+    else:
+        assert False
+
+    alr, alm = ''.join(alr), ''.join(alm)
+    return alr, alm, score, sec_score, jump, orient
+
+
+def calc_identity(a, b): # global alignment identity
+    alignment = edlib.align(a, b, task='path')
+    cigar, cigar_stats = parse_cigar(alignment['cigar'])
+    alignment_len = sum(cigar_stats.values())
+    return 1 - alignment['editDistance'] / alignment_len

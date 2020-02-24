@@ -156,7 +156,7 @@ class MonoString:
         return resulting_monostrings
 
 
-def ident_hybrids(df, monomer_names_map, 
+def ident_hybrids(df, monomer_names_map,
                   max_ident_diff=5, min_occ=500):
     def count_pairs(df):
         pairs = []
@@ -169,13 +169,13 @@ def ident_hybrids(df, monomer_names_map,
                 pairs.append((m1, m2))
         cnt = Counter(pairs)
         return cnt
-    
+
     def get_med_pair_p(all_cnt, pairing_cnt, min_occ=min_occ):
         ps = [pairing_cnt[pair] / all_cnt[pair]
               for pair in all_cnt.keys()
               if all_cnt[pair] >= min_occ]
         return np.median(ps)
-    
+
     def recr_sign_pairs(all_cnt, pairing_cnt, med_pair_p,
                         alpha=0.05, min_occ=min_occ, min_pc=5):
         pairs = []
@@ -184,20 +184,20 @@ def ident_hybrids(df, monomer_names_map,
             if ac < min_occ or pc < min_pc:
                 continue
             pv = binom_test(pc, ac, p=med_pair_p, alternative='greater')
-            
+
             if pv * len(all_cnt) < alpha:
                 print(pv, ac, pc, pair)
                 pairs.append((pv, pair))
         pairs.sort()
-        
+
         max_char = max(monomer_names_map.values())
         max_index = ascii_lowercase.index(max_char)
         left_letters = len(ascii_lowercase) - max_index
-        
+
         print(pairs)
         pairs = [pair for (pv, pair) in pairs[:left_letters]]
         return pairs
-    
+
     def get_pair2char(pairs):
         pair2char = {}
         lower_alphabet, upper_alphabet = list(ascii_lowercase), list(ascii_uppercase)
@@ -212,14 +212,14 @@ def ident_hybrids(df, monomer_names_map,
             pair2char[lower_pair[::-1]] = lower_alphabet[index]
             index += 1
         return pair2char
-    
+
     def transform_df(df_pairing, pair2char):
         for i, row in df_pairing.iterrows():
             pair = (row.monomer, row.sec_monomer)
             if pair in pair2char:
                 df.at[i, 'monomer'] = pair2char[pair]
         return df
-    
+
     all_cnt = count_pairs(df)
     close_identity = (abs(df.identity - df.sec_identity) < max_ident_diff) & (df.reliability == '+')
     pairing = close_identity
@@ -228,25 +228,25 @@ def ident_hybrids(df, monomer_names_map,
     med_pair_p = get_med_pair_p(all_cnt, pairing_cnt)
     pairs = recr_sign_pairs(all_cnt, pairing_cnt, med_pair_p)
     pair2char = get_pair2char(pairs)
-    
+
     transformed_df = transform_df(df[pairing], pair2char)
     return transformed_df, pair2char
-    
+
 
 class SD_Report:
     def __init__(self, SD_report_fn, monomers_fn,
                  max_gap=100,
                  gap_symb='?',
-                 ident_hybrid=True):
+                 ident_hybrid=False):
         self.gap_symb = gap_symb
-        monomers = read_bio_seqs(monomers_fn)
+        self.monomers = read_bio_seqs(monomers_fn)
         mean_monomer_len = \
-            np.mean([len(monomer) for monomer in monomers.values()])
+            np.mean([len(monomer) for monomer in self.monomers.values()])
 
         self.monomer_names_map = {}
         self.rev_monomer_names_map = {}
         for monomer_name, ucode, lcode in \
-                zip(monomers.keys(), ascii_uppercase, ascii_lowercase):
+                zip(self.monomers.keys(), ascii_uppercase, ascii_lowercase):
             self.monomer_names_map[monomer_name] = ucode
             self.monomer_names_map[monomer_name + "'"] = lcode
             self.rev_monomer_names_map[ucode] = monomer_name
@@ -264,7 +264,7 @@ class SD_Report:
                                 ])
         df.monomer = df.monomer.apply(lambda x: self.monomer_names_map[x])
         df.sec_monomer = df.sec_monomer.apply(lambda x: self.monomer_names_map[x])
-        
+
         if ident_hybrid:
             df, self.pair2char = ident_hybrids(df, monomer_names_map=self.monomer_names_map)
         else:
