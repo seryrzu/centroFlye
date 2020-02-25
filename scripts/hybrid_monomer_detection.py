@@ -173,7 +173,7 @@ def main():
                                       A, B)
         if hybrid is not None:
             print(pair, hybrid, jump)
-            hybrids[f'{pair[0]}_{pair[1]}|{jump[0]}|{jump[1]}'] = hybrid
+            hybrids[f'{pair[0]}_{pair[1]}|{jump[0][0]}_{jump[0][1]}|{jump[1]}'] = hybrid
     write_bio_seqs(params.outfile, hybrids)
 
 
