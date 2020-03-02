@@ -204,17 +204,6 @@ def min_cyclic_shift(s):
     return min_shift
 
 
-# from https://stackoverflow.com/a/40927266
-def weighted_random_by_dct(dct):
-    rand_val = np.random.random()
-    total = 0
-    for k, v in dct.items():
-        total += v
-        if rand_val <= total:
-            return k
-    assert False, 'unreachable'
-
-
 def get_mut_config(data_type):
     if data_type == 'pacbio':
         config_fn = os.path.join(script_dir, '..', '..',
@@ -468,3 +457,28 @@ def calc_identity(a, b): # global alignment identity
     cigar, cigar_stats = parse_cigar(alignment['cigar'])
     alignment_len = sum(cigar_stats.values())
     return 1 - alignment['editDistance'] / alignment_len
+
+
+def group_cuts(s1, s2):
+    a1, a2 = parse_cigar(edlib.align(s1, s2, task='path')['cigar'], s1, s2)[2:]
+    a1 += '1'
+    a2 += '2'
+    i, j = 0, 0
+    m_regs = []
+    st1, st2 = 0, 0
+    for k, (c1, c2) in enumerate(zip(a1, a2)):
+
+        if c1 != c2 and st1 < i and st2 < j:
+            m_regs.append(((st1, i), (st2, j)))
+
+        if c1 != '-':
+            i += 1
+        if c2 != '-':
+            j += 1
+
+        if c1 != c2:
+            st1, st2 = i, j
+
+    for (st1, en1), (st2, en2) in m_regs:
+        assert s1[st1:en1] == s2[st2:en2]
+    return m_regs
