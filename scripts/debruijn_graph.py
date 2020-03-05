@@ -17,7 +17,7 @@ from utils.os_utils import smart_makedirs
 
 
 class DeBruijnGraph:
-    def __init__(self, k, max_uniq_cov=60, min_uniq_len=1000):
+    def __init__(self, k, max_uniq_cov=60, min_uniq_len=700):
         self.graph = nx.MultiDiGraph()
         self.k = k
         self.node_mapping = {}
