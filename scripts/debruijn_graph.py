@@ -320,7 +320,22 @@ def get_frequent_kmers(strings, k, min_mult=5):
 
 
 def iterative_graph(monostrings, min_k, max_k, outdir,
-                    min_mult=5, step=1, starting_graph=None, verbose=True):
+                    def_min_mult=None, step=1, starting_graph=None, verbose=True):
+    def get_min_mult(k):
+        if def_min_mult is not None:
+            return def_min_mult
+        if k < 100:
+            return 25
+        elif 100 <= k < 150:
+            return 20
+        elif 150 <= k < 200:
+            return 15
+        elif 200 <= k < 250:
+            return 10
+        elif 250 <= k < 300:
+            return 5
+        elif 300 <= k:
+            return 3
     smart_makedirs(outdir)
     dbs, uncompr_dbs, all_contigs = {}, {}, {}
     all_frequent_kmers, all_frequent_kmers_read_pos = {}, {}
@@ -328,6 +343,7 @@ def iterative_graph(monostrings, min_k, max_k, outdir,
     input_strings = strings.copy()
     complex_kp1mers = {}
 
+    min_mult = get_min_mult(min_k)
     if starting_graph is not None:
         contigs, contig_paths = starting_graph.get_contigs()
         for i in range(len(contigs)):
@@ -337,19 +353,21 @@ def iterative_graph(monostrings, min_k, max_k, outdir,
         complex_kp1mers = get_paths_thru_complex_nodes(starting_graph, strings)
 
     for k in range(min_k, max_k+1, step):
+        min_mult = get_min_mult(k)
         frequent_kmers, frequent_kmers_read_pos = \
             get_frequent_kmers(input_strings, k=k, min_mult=min_mult)
         frequent_kmers.update(complex_kp1mers)
         if verbose:
             print(f'\nk={k}')
             print(f'#frequent kmers = {len(frequent_kmers)}')
+            print(f'min_mult = {min_mult}')
         all_frequent_kmers[k] = frequent_kmers
         all_frequent_kmers_read_pos[k] = frequent_kmers_read_pos
 
         db = DeBruijnGraph(k=k)
         db.add_kmers(frequent_kmers, coverage=frequent_kmers)
         uncompr_dbs[k] = deepcopy(db)
-        
+
         db.collapse_nonbranching_paths()
         if verbose and nx.number_weakly_connected_components(db.graph) > 1:
             print(f'#cc = {nx.number_weakly_connected_components(db.graph)}')
