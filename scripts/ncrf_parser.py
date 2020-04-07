@@ -2,9 +2,11 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+import argparse
 import regex as re
 from utils.bio import RC
 from collections import defaultdict, namedtuple
+import numpy as np
 
 
 class NCRF_Report:
@@ -56,7 +58,7 @@ class NCRF_Report:
                 motif_alignments.append(ma)
             return motif_alignments
 
-    def __init__(self, report_fn, min_record_len=5000, min_alignment_len=500):
+    def __init__(self, report_fn, min_record_len=5000):
         self.records = {}
         self.positions_all_alignments = defaultdict(list)
         # self.longest_alignment_index = {}
@@ -80,8 +82,8 @@ class NCRF_Report:
                 al_score = int(al_score)
                 seen_r_ids.append(r_id)
 
-                if r_al_len < min_alignment_len:
-                    continue
+                # if r_al_len < min_alignment_len:
+                #     continue
 
                 self.positions_all_alignments[r_id].append((r_st, r_en, strand))
                 self.read_lens[r_id] = r_len
@@ -115,7 +117,7 @@ class NCRF_Report:
             if r_id not in self.records:
                 self.discarded_reads.append(r_id)
 
-    def classify(self, large_threshold=50000, small_threshold=1000):
+    def classify(self, large_threshold, small_threshold=1000):
         prefix_reads, suffix_reads, internal_reads = [], [], []
         for r_id, record in self.records.items():
             r_len = self.read_lens[r_id]
@@ -142,6 +144,26 @@ class NCRF_Report:
                 internal_reads.append(r_id)
         return prefix_reads, internal_reads, suffix_reads
 
+    def get_efficiency(self):
+        efficiency = {}
+        total_length = 0
+        total_used_length = 0
+        for r_id, alignments in self.positions_all_alignments.items():
+            all_alignments_len = \
+                sum(alignment[1] - alignment[0] + 1 \
+                    for alignment in alignments)
+            total_length += all_alignments_len
+            if r_id not in self.records:
+                efficiency[r_id] = 0
+            else:
+                record = self.records[r_id]
+                record_len = record.r_en - record.r_st + 1
+                total_used_length += record_len
+                efficiency[r_id] = record_len / all_alignments_len
+        global_efficiency = total_used_length / total_length
+        return efficiency, global_efficiency
+
+
     '''
     :param n = number of motifs stuck together (seek for motif*n)
     '''
@@ -150,3 +172,34 @@ class NCRF_Report:
         for read_id, record in self.records.items():
             motifs_alignments[read_id] = record.get_motif_alignments(n=n)
         return motifs_alignments
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ncrf", help="NCRF report")
+    parser.add_argument('--prefix-threshold',
+                        help='Min pre/suffix length for read classification',
+                        default=50000,
+                        type=int)
+    params = parser.parse_args()
+
+    ncrf_report = NCRF_Report(params.ncrf)
+    print(f"# records: {len(ncrf_report.records)}")
+    prefix_reads, internal_reads, suffix_reads = \
+        ncrf_report.classify(large_threshold=params.prefix_threshold)
+    print(f"# prefix reads {len(prefix_reads)}")
+    for read in prefix_reads:
+        print(read[:8])
+    print(f"# internal reads {len(internal_reads)}")
+    print(f"# suffix reads {len(suffix_reads)}")
+    for read in suffix_reads:
+        print(read[:8])
+
+    efficiency, global_efficiency = ncrf_report.get_efficiency()
+    print(f'Mean efficiency = {np.mean(list(efficiency.values()))}')
+    print(f'Median efficiency = {np.median(list(efficiency.values()))}')
+    print(f'Global efficiency = {global_efficiency}')
+
+
+if __name__ == "__main__":
+    main()
