@@ -67,8 +67,11 @@ def gen_random_seq(length, bases=list("ACGT")):
     return sequence
 
 
-def compress_homopolymer(seq):
-    return ''.join(x[0] for x in groupby(list(seq)))
+def compress_homopolymer(seq, return_list=False):
+    compressed_seq = [x[0] for x in groupby(list(seq))]
+    if return_list:
+        return compressed_seq
+    return ''.join()
 
 
 def hamming_distance(s1, s2, match_char=set()):
@@ -189,8 +192,8 @@ def parse_cigar(cigar, s1=None, s2=None):
             a1 += s1[i1:i1+region_len]
             i1 += region_len
 
-    a1 = ''.join(a1)
-    a2 = ''.join(a2)
+    # a1 = ''.join(a1)
+    # a2 = ''.join(a2)
     return parsed_cigar, cnt, a1, a2
 
 

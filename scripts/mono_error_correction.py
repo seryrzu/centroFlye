@@ -20,7 +20,8 @@ def get_ma(x, N):
 def filter_lowercaserich_reads(monoreads, max_lowercase=0.1):
     filtered_strings = {}
     for r_id, string in monoreads.items():
-        lowercase = [s.islower() for s in string]
+        lowercase = [s >= string.rev_monomer_index
+                     for s in string if isinstance(s, int)]
         if np.mean(lowercase) <= max_lowercase:
             filtered_strings[r_id] = string
     return filtered_strings
@@ -101,7 +102,7 @@ def correct_gaps(monostrings, max_gap=0.3, nhor=1,
     return monostrings
 
 
-def error_correction(monoreads, inplace=True, verbose=False, hor_correction=True):
+def error_correction(monoreads, inplace=True, verbose=False, hor_correction=False):
     if not inplace:
         monoreads = deepcopy(monoreads)
 

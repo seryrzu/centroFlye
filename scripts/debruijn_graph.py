@@ -79,10 +79,17 @@ class DeBruijnGraph:
 
     def collapse_nonbranching_paths(self):
         def node_on_nonbranching_path(graph, node):
-            return nx.number_of_nodes(graph) > 1 \
-                and graph.in_degree(node) == 1 \
-                and graph.out_degree(node) == 1
-
+            in_degree = graph.in_degree(node)
+            out_degree = graph.out_degree(node)
+            if graph.in_degree(node) != 1 or \
+                    graph.out_degree(node) != 1:
+                return False
+            in_edges = list(graph.in_edges(node))
+            in_edge = in_edges[0]
+            out_edges = list(graph.out_edges(node))
+            out_edge = out_edges[0]
+            return in_edge != out_edge
+        
         for node in list(self.graph.nodes()):
             if node_on_nonbranching_path(self.graph, node):
                 in_edge = list(self.graph.in_edges(node, keys=True))[0]
@@ -123,17 +130,17 @@ class DeBruijnGraph:
         return contigs, coverages
 
     def get_path(self, list_edges):
-        path = ''
+        path = []
         path += self.graph.get_edge_data(*list_edges[0])['edge_kmer']
         for edge in list_edges[1:]:
             new_edge_seq = self.graph.get_edge_data(*edge)['edge_kmer']
-            assert path[-(self.k-1):] == new_edge_seq[:self.k-1]
+            assert tuple(path[-(self.k-1):]) == new_edge_seq[:self.k-1]
             path += new_edge_seq[self.k-1:]
 
         # process cycled path
         if list_edges[0][0] == list_edges[-1][1]:
             path = path[:-(self.k-1)]
-        return path
+        return tuple(path)
 
     def get_edgepath2coords(self, list_edges):
         edgepath2coords = {}
@@ -277,7 +284,7 @@ def get_all_kmers(strings, k, gap_symb='?'):
     read_kmer_locations = defaultdict(list)
     for r_id, string in strings.items():
         for i in range(len(string)-k+1):
-            kmer = string[i:i+k]
+            kmer = tuple(string[i:i+k])
             if gap_symb not in kmer:
                 all_kmers[kmer] += 1
                 read_kmer_locations[kmer].append((r_id, i))
@@ -304,7 +311,7 @@ def get_paths_thru_complex_nodes(db, strings, min_mult=2):
                 in_kmer = in_edge[3]['edge_kmer'][-k:]
                 out_kmer = out_edge[3]['edge_kmer'][:k]
                 assert in_kmer[1:] == out_kmer[:-1]
-                kp1 = in_kmer + out_kmer[-1]
+                kp1 = in_kmer + tuple([out_kmer[-1]])
                 if all_kp1mers[kp1] >= min_mult:
                     selected_kp1mers[kp1] = all_kp1mers[kp1]
     return selected_kp1mers
@@ -320,7 +327,8 @@ def get_frequent_kmers(strings, k, min_mult=5):
 
 
 def iterative_graph(monostrings, min_k, max_k, outdir,
-                    def_min_mult=None, step=1, starting_graph=None, verbose=True):
+                    def_min_mult=None, step=1, starting_graph=None,
+                    verbose=True):
     def get_min_mult(k):
         if def_min_mult is not None:
             return def_min_mult
@@ -339,7 +347,7 @@ def iterative_graph(monostrings, min_k, max_k, outdir,
     smart_makedirs(outdir)
     dbs, uncompr_dbs, all_contigs = {}, {}, {}
     all_frequent_kmers, all_frequent_kmers_read_pos = {}, {}
-    strings = {k: ''.join(v.string) for k, v in monostrings.items()}
+    strings = {r_id: monostring.string for r_id, monostring in monostrings.items()}
     input_strings = strings.copy()
     complex_kp1mers = {}
 
@@ -377,10 +385,16 @@ def iterative_graph(monostrings, min_k, max_k, outdir,
         dbs[k] = db
 
         dot_file = os.path.join(outdir, f'db_k{k}.dot')
-        # pdf_file = os.path.join(outdir, f'db_k{k}.pdf')
         nx.drawing.nx_pydot.write_dot(db.graph, dot_file)
-        # os.system(f"dot -Tpdf {dot_file} -o {pdf_file}")
+        
+        compact_graph = deepcopy(db.graph)
+        for u, v, data in compact_graph.edges(data=True):
+            data['coverages'] = None
+            data['edge_kmer'] = None
 
+        dot_compact_file = os.path.join(outdir, f'db_k{k}_compact.dot')
+        nx.drawing.nx_pydot.write_dot(compact_graph, dot_compact_file)
+        
         contigs, contig_paths = db.get_contigs()
         all_contigs[k] = contigs
 
@@ -394,7 +408,7 @@ def iterative_graph(monostrings, min_k, max_k, outdir,
     return all_contigs, dbs, uncompr_dbs, all_frequent_kmers, all_frequent_kmers_read_pos
 
 
-def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
+def scaffolding(db, mappings, min_connections=1, additional_edges=list()):
     def find_connections(additional_edges):
         long_edges = db.get_long_edges()
         long_edges_ids = list(long_edges.keys())
@@ -419,6 +433,11 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
                         long_edge_pair = (path[i], path[j])
                         connection = tuple(path[i:j+1])
                         connections[long_edge_pair][connection] += 1
+        for ee, ee_connections in connections.items():
+            print(ee)
+            for connection, val in ee_connections.items():
+                print(connection, val)
+            print("\n")
         return connections
 
     def build_scaffold_graph(connections):
@@ -436,6 +455,7 @@ def scaffolding(db, mappings, min_connections=2, additional_edges=list()):
     def select_lists(scaffold_graph):
         longedge_scaffolds = []
         for cc in nx.weakly_connected_components(scaffold_graph):
+            print(cc)
             cc_sg = scaffold_graph.subgraph(cc)
             if nx.is_directed_acyclic_graph(cc_sg):
                 top_sort = list(nx.topological_sort(cc_sg))

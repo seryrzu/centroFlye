@@ -4,7 +4,8 @@
 
 import argparse
 from collections import Counter
-from string import ascii_uppercase, ascii_lowercase
+# from string import ascii_uppercase, ascii_lowercase
+import unicodedata as ud
 
 from scipy.stats import binom_test
 import numpy as np
@@ -14,10 +15,12 @@ from utils.bio import read_bio_seqs, compress_homopolymer
 
 
 class MonoString:
-    def __init__(self, name,
+    # string is stored as a list
+    def __init__(self, name, rev_monomer_index,
                  string=list(), mono2nucl=dict(),
                  gap_symb='?', strand='+'):
         self.name = name
+        self.rev_monomer_index = rev_monomer_index
         self.string = string.copy()
         self.mono2nucl = mono2nucl.copy()
         self.gap_symb = gap_symb
@@ -25,10 +28,13 @@ class MonoString:
 
     @classmethod
     def FromSDRecord(cls, name, monomers, starts, ends, reliability,
-                     max_gap, mean_monomer_len, gap_symb):
+                     max_gap, mean_monomer_len, gap_symb, rev_monomer_index):
 
-        monostring = cls(name=name)
+        monostring = cls(name=name, rev_monomer_index=rev_monomer_index)
 
+        # Ignore the first and last monomer, as they may be incomplete
+        monomers, starts, ends = monomers[1:-1], starts[1:-1], ends[1:-1]
+        
         if reliability[0] == '+':
             monostring.add_monomer(monomer=monomers[0],
                                    st=starts[0],
@@ -54,8 +60,8 @@ class MonoString:
         monostring.check_reverse()
         return monostring
 
-    def tostring(self):
-        return ''.join(self.string)
+    # def tostring(self):
+    #     return ''.join(self.string)
 
     def __len__(self):
         return self.string.__len__()
@@ -63,7 +69,7 @@ class MonoString:
     def __getitem__(self, sub):
         if isinstance(sub, slice):
             sublist = self.string[sub.start:sub.stop:sub.step]
-            sublist = ''.join(sublist)
+            # sublist = ''.join(sublist)
             return sublist
         return self.string[sub]
 
@@ -93,16 +99,22 @@ class MonoString:
         self.string += [self.gap_symb] * length
 
     def check_reverse(self):
-        perc_lower_case = np.mean([c.islower() for c in self.string
-                                   if c.lower() != c.upper()])
+        def swapcase_monomer(m):
+            if not isinstance(m, int):
+                return m
+            if m >= self.rev_monomer_index:
+                return m - self.rev_monomer_index
+            return m + self.rev_monomer_index
+
+        perc_lower_case = np.mean([c > self.rev_monomer_index for c in self.string
+                                   if isinstance(c, int)])
         if perc_lower_case > 0.5:
-            self.string = self.string[::-1]
-            self.string = [m.swapcase() for m in self.string]
+            self.string = [swapcase_monomer(m) for m in self.string[::-1]]
             self.strand = '-'
             rev_mono2nucl = {}
             for coord, (monomer, st, en) in self.mono2nucl.items():
                 rev_coord = len(self.string) - coord - 1
-                rev_mono2nucl[rev_coord] = (monomer.swapcase(), en, st)
+                rev_mono2nucl[rev_coord] = (swapcase_monomer(monomer), en, st)
             self.mono2nucl = rev_mono2nucl
         self.assert_validity()
 
@@ -123,7 +135,16 @@ class MonoString:
 
     def split(self, c, min_length):
         resulting_monostrings = {}
-        split_strings = self.tostring().split(c)
+
+        split_strings = []
+        i = 0
+        while i < len(self.string):
+            j = i
+            while j < len(self.string) and self.string[j] != c:
+                j += 1
+            if j > i:
+                split_strings.append(self.string[i:j])
+            i = j + 1
 
         pos = list(self.mono2nucl)
         coord_pos = 0
@@ -145,6 +166,7 @@ class MonoString:
                 coord_pos += 1
 
             new_monostring = MonoString(name=self.name,
+                                        rev_monomer_index=self.rev_monomer_index,
                                         string=list(split_string),
                                         mono2nucl=split_mono2nucl,
                                         gap_symb=self.gap_symb,
@@ -200,7 +222,8 @@ def ident_hybrids(df, monomer_names_map,
 
     def get_pair2char(pairs):
         pair2char = {}
-        lower_alphabet, upper_alphabet = list(ascii_lowercase), list(ascii_uppercase)
+        lower_alphabet = get_unicode_lowercase()
+        upper_alphabet = get_unicode_uppercase()
         max_char = max(monomer_names_map.values())
         index = lower_alphabet.index(max_char) + 1
         for pair in pairs:
@@ -233,11 +256,30 @@ def ident_hybrids(df, monomer_names_map,
     return transformed_df, pair2char
 
 
+def get_unicode():
+    return ''.join(chr(i) for i in range(65536))
+
+
+def get_unicode_uppercase():
+    all_unicode = get_unicode()
+    uppercase = ''.join(c for c in all_unicode
+                        if ud.category(c)=='Lu')
+    uppercase = uppercase.lower().upper()
+    uppercase = Counter(uppercase)
+    uppercase = ''.join(c for c in uppercase if uppercase[c] == 1)
+    return uppercase
+
+
+def get_unicode_lowercase():
+    unicode_uppercase = get_unicode_uppercase()
+    return unicode_uppercase.lower()
+
+
 class SD_Report:
     def __init__(self, SD_report_fn, monomers_fn,
                  max_gap=100,
                  gap_symb='?',
-                 ident_hybrid=False):
+                 hpc=True):
         self.gap_symb = gap_symb
         self.monomers = read_bio_seqs(monomers_fn)
         mean_monomer_len = \
@@ -245,32 +287,38 @@ class SD_Report:
 
         self.monomer_names_map = {}
         self.rev_monomer_names_map = {}
-        for monomer_name, ucode, lcode in \
-                zip(self.monomers.keys(), ascii_uppercase, ascii_lowercase):
-            self.monomer_names_map[monomer_name] = ucode
-            self.monomer_names_map[monomer_name + "'"] = lcode
-            self.rev_monomer_names_map[ucode] = monomer_name
+        for i, monomer_name in enumerate(self.monomers.keys()):
+            self.monomer_names_map[monomer_name] = i 
+            self.monomer_names_map[monomer_name + "'"] = i + len(self.monomers)
+            self.rev_monomer_names_map[i] = monomer_name
+        self.monomer_names_map['None'] = '*' # '?' is reserved for '*'
 
         self.monostrings = {}
+        if hpc:
+            names = ['r_id', 'monomer',
+                     'r_st', 'r_en',
+                     'identity',
+                     'sec_monomer', 'sec_identity',
+                     'homo_monomer', 'homo_identity',
+                     'sec_homo_monomer', 'sec_homo_identity',
+                     'reliability'
+                    ]
+        else:
+            names = ['r_id', 'monomer',
+                     'r_st', 'r_en',
+                     'identity',
+                     'sec_monomer', 'sec_identity',
+                     'reliability'
+                    ]
+            
         df = pd.read_csv(SD_report_fn, sep='\t',
                          header=None,
-                         names=['r_id', 'monomer',
-                                'r_st', 'r_en',
-                                'identity',
-                                'sec_monomer', 'sec_identity',
-                                'homo_monomer', 'homo_identity',
-                                'sec_homo_monomer', 'sec_homo_identity',
-                                'reliability'
-                                ])
+                         names=names)
         df.monomer = df.monomer.apply(lambda x: self.monomer_names_map[x])
         df.sec_monomer = df.sec_monomer.apply(lambda x: self.monomer_names_map[x])
 
-        if ident_hybrid:
-            df, self.pair2char = ident_hybrids(df, monomer_names_map=self.monomer_names_map)
-        else:
-            self.pair2char = None
-
         for r_id, group in df.groupby('r_id'):
+            group = group.sort_values(by=['r_st'])
             self.monostrings[r_id] = \
                 MonoString.FromSDRecord(name=r_id,
                                         monomers=group.monomer.to_list(),
@@ -279,7 +327,8 @@ class SD_Report:
                                         reliability=group.reliability.to_list(),
                                         max_gap=max_gap,
                                         mean_monomer_len=mean_monomer_len,
-                                        gap_symb=self.gap_symb)
+                                        gap_symb=self.gap_symb,
+                                        rev_monomer_index=len(self.monomers))
         self.df = df
 
 
@@ -287,7 +336,7 @@ def get_ngap_symbols(monostrings, compr_hmp=False, gap_symb='?'):
     cnt = 0
     for monostring in monostrings.values():
         if compr_hmp:
-            monostring = compress_homopolymer(monostring)
+            monostring = compress_homopolymer(monostring, return_list=True)
         cnt += Counter(monostring)[gap_symb]
     return cnt
 
