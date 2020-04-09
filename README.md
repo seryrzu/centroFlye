@@ -1,6 +1,6 @@
 # centroFlye
 
-### Version 0.8.3 (initial release)
+### Version 0.8.3 cenX + 0.1.3 cen6
 ## Overview
 centroFlye (Bzikadze et al., 2019) is an algorithm for centromere assembly using long error-prone reads.
 Currently it supports assembly of a human centromere 6 (referred to as cen6) and X (referred to as cenX).
