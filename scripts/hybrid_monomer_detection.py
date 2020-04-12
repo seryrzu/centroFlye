@@ -18,7 +18,7 @@ def parse_args():
     parser.add_argument("--reads", required=True, help="Cen reads")
     parser.add_argument("--max-ident-diff", type=int, default=5)
     parser.add_argument("--min-sec-ident", type=int, default=80)
-    parser.add_argument("--threads", type=int, default=50)
+    parser.add_argument("--threads", type=int, default=30)
     parser.add_argument("--outfile", required=True)
     parser.add_argument("--genome-len", type=int, required=True)
     params = parser.parse_args()
@@ -27,8 +27,7 @@ def parse_args():
 
 def read_input(params):
     sd_report = SD_Report(SD_report_fn=params.sd,
-                          monomers_fn=params.monomers,
-                          ident_hybrid=False)
+                          monomers_fn=params.monomers)
     reads = read_bio_seqs(params.reads)
     return sd_report, reads
 
@@ -37,27 +36,25 @@ def get_putative_pairs(names):
     putative_pairs = []
     for m1 in names:
         for m2 in names:
-            if m1.islower() or m2.islower() or (m1 >= m2):
-                continue
-            else:
+            if m1 < m2:
                 putative_pairs.append((m1, m2))
     return putative_pairs
 
 
-def extract_hybrid(pair, df, reads,
+def extract_hybrid(pair, sd_report, reads,
                    A, B,
                    max_ident_diff,
                    min_sec_ident,
                    threads,
                    coverage,
                    sign_lev=0.05):
-    def extract_read_segms(df, reads):
+    def extract_read_segms(sd_report, df, reads):
         segms = []
         for i, row in df.iterrows():
             r_id, st, en = row.r_id, row.r_st, row.r_en + 1
             monomer = row.monomer
             segm = reads[r_id][st:en]
-            if monomer.islower():
+            if sd_report.is_upper(monomer):
                 segm = RC(segm)
             segms.append(segm)
         return segms
@@ -86,10 +83,11 @@ def extract_hybrid(pair, df, reads,
         return n_improved, min_improved, max_improved
 
     results = {
-        "status": False,
+        "status": False
     }
+    df = sd_report.df
     bases = list(pair)
-    bases += [b.lower() for b in bases]
+    bases += sd_report.get_rev_index(bases)
     AB = np.where(df.monomer.isin(bases) &
                   df.sec_monomer.isin(bases) &
                   (abs(df.identity - df.sec_identity) < max_ident_diff) &
@@ -97,9 +95,8 @@ def extract_hybrid(pair, df, reads,
                   df.reliability.isin(['+']))[0]
     dfAB = df.iloc[AB]
 
-    read_segms = extract_read_segms(dfAB, reads)
+    read_segms = extract_read_segms(sd_report, dfAB, reads)
     np.random.shuffle(read_segms)
-    # print(len(read_segms))
     if len(read_segms) < coverage * 0.5:
         return results
 
@@ -107,13 +104,17 @@ def extract_hybrid(pair, df, reads,
 
     results["ntrain"] = nreads
     results["ntest"] = nreads
+
+    # import pandas as pd
+    # with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+    #     print(dfAB[['monomer', 'identity', 'sec_monomer', 'sec_identity']])
+
     train, test = read_segms[:nreads], read_segms[nreads:nreads*2]
     jumps = Counter(get_cuts(train, A, B))
     if len(jumps) == 0:
         return results
     results["jumps"] = jumps
 
-    # print(jumps)
     mc_jump = jumps.most_common(1)[0]
     if mc_jump[1] < 5:
         return results
@@ -134,7 +135,6 @@ def extract_hybrid(pair, df, reads,
     results["min_ident"] = min_ident
     results["max_ident"] = max_ident
 
-    # print(train_n_improved, test_n_improved, len(train), len(test))
     if train_n_improved == 0 or test_n_improved == 0:
         return results
     elif train_n_improved == len(train) or test_n_improved == len(test):
@@ -142,7 +142,7 @@ def extract_hybrid(pair, df, reads,
         results["test_n_improved"] = test_n_improved
         results["hybrid"] = hybrid
         results["status"] = True
-        return results  # (hybrid, (mc_jump, orient))
+        return results
 
     stat, pval = proportions_ztest([train_n_improved, test_n_improved],
                                    [len(train), len(test)])
@@ -152,7 +152,7 @@ def extract_hybrid(pair, df, reads,
     results["test_n_improved"] = test_n_improved
     results["hybrid"] = hybrid
     results["status"] = True
-    return results  # (hybrid, (mc_jump, orient))
+    return results
 
 
 def main():
@@ -161,16 +161,15 @@ def main():
     coverage = 171 * len(sd_report.df) / params.genome_len
     print(f'Estimated coverage {coverage}x')
 
-    putative_pairs = get_putative_pairs(sd_report.monomer_names_map.values())
-    # putative_pairs = [('K', 'L')]
-    # print(putative_pairs)
+    putative_pairs = get_putative_pairs(sd_report.get_monomer_encoded_names())
 
     hybrids = {}
     for pair in putative_pairs:
-        A = sd_report.monomers[sd_report.rev_monomer_names_map[pair[0]]]
-        B = sd_report.monomers[sd_report.rev_monomer_names_map[pair[1]]]
+        a, b = pair
         print(pair)
-        extraction_res = extract_hybrid(pair, sd_report.df, reads,
+        A = sd_report.monomers[sd_report.rev_monomer_names_map[a]]
+        B = sd_report.monomers[sd_report.rev_monomer_names_map[b]]
+        extraction_res = extract_hybrid(pair, sd_report, reads,
                                         A, B,
                                         params.max_ident_diff,
                                         params.min_sec_ident,
@@ -180,7 +179,7 @@ def main():
             pprint(extraction_res, width=1)
             print("")
             hybrid, (jump, orient) = extraction_res["hybrid"], extraction_res["mc_jump"]
-            hybrids[f'{pair[0]}_{pair[1]}|{jump[0]}_{jump[1]}|{orient}'] = hybrid
+            hybrids[f'{a}_{b}|{jump[0]}_{jump[1]}|{orient}'] = hybrid
     write_bio_seqs(params.outfile, hybrids)
 
 

@@ -232,25 +232,39 @@ class DeBruijnGraph:
         return contigs, valid_paths
 
     def map_reads(self, monoreads, gap_symb='?', verbose=True):
+        def split_list(lst, e):
+            spl_lst = []
+            spl = []
+            for x in lst:
+                if x != e:
+                    spl.append(x)
+                else:
+                    spl_lst.append(spl)
+                    spl = []
+            if len(spl):
+                spl_lst.append(spl)
+            return spl_lst
+
         self.index_edges()
         mapping = {}
         db_edges = list(self.graph.edges(keys=True))
-        monoreads = {r_id: ''.join(monoread.string)
+        monoreads = {r_id: monoread.string
                      for r_id, monoread in monoreads.items()}
         for i, (r_id, string) in enumerate(monoreads.items()):
             if verbose:
                 print(i+1, len(monoreads))
 
-            split_strings = string.split(gap_symb)
+            split_strings = split_list(string, gap_symb)
             read_coords = []
             cumm_len = 0
             for split_ind, split_string in enumerate(split_strings):
                 for i in range(len(split_string)-self.k+1):
-                    kmer = split_string[i:i+self.k]
+                    kmer = tuple(split_string[i:i+self.k])
                     if kmer in self.db_index[len(kmer)]:
                         read_coords.append((self.db_index[len(kmer)][kmer],
                                             cumm_len + i))
                         string_kmer = string[cumm_len+i:cumm_len+i+min(self.k, len(split_string))]
+                        string_kmer = tuple(string_kmer)
                         assert string_kmer == kmer
                 cumm_len += len(split_string) + 1
 
@@ -687,3 +701,137 @@ def polish(scaffolds, pseudounits, read_pseudounits, reads, monomers, outdir,
         polished_scaffold_fn = os.path.join(scaf_outdir, f'scaffold_{i}.fasta')
         write_bio_seqs(polished_scaffold_fn,
                        {f'scaffold_{i}_niter_{n_iter}': polished_scaffold})
+
+
+# 3-colored graph for assembly debug
+def graph3col_uncompr(gr_assembly, gr_reads):
+    gr = nx.MultiDiGraph()
+    k = gr_assembly.k
+    
+    nodes_assembly = set(gr_assembly.rev_node_mapping[kmer] for kmer in gr_assembly.graph.nodes)
+    nodes_reads = set(gr_reads.rev_node_mapping[kmer] for kmer in gr_reads.graph.nodes)
+    nodes_both = nodes_assembly & nodes_reads
+    nodes_assembly = nodes_assembly - nodes_both
+    nodes_reads = nodes_reads - nodes_both
+    nodes_all = nodes_assembly | nodes_reads | nodes_both
+    print(len(nodes_both), len(nodes_assembly), len(nodes_reads))
+    nodes_index = {node: i for i, node in enumerate(nodes_all)}
+    
+    edges_assembly = set(edge[2]['edge_kmer'] for edge in gr_assembly.graph.edges(data=True))
+    edges_assembly_cov = {edge[2]['edge_kmer']: edge[2]['coverages']
+                          for edge in gr_assembly.graph.edges(data=True)}
+    edges_reads = set(edge[2]['edge_kmer'] for edge in gr_reads.graph.edges(data=True))
+    edges_reads_cov = {edge[2]['edge_kmer']: edge[2]['coverages']
+                       for edge in gr_reads.graph.edges(data=True)}
+    edges_both = edges_assembly & edges_reads
+    edges_assembly = edges_assembly - edges_both
+    edges_reads = edges_reads - edges_both
+    edges_all = edges_assembly | edges_reads | edges_both
+    print(len(edges_both), len(edges_assembly), len(edges_reads))
+    edges_index = {edge: i for i, edge in enumerate(edges_all)}
+    
+    def add_nodes(nodes, color):
+        for node in nodes:
+            gr.add_node(nodes_index[node], kmer=node, color=color)
+    
+    add_nodes(nodes_reads, color='red')
+    add_nodes(nodes_assembly, color='blue')
+    add_nodes(nodes_both, color='green')
+    
+    def add_edges(edges, color):
+        for edge in edges:
+            stkmer = edge[:k-1]
+            enkmer = edge[-k+1:]
+            strlen = len(edges_assembly_cov[edge]) \
+                     if edge in edges_assembly_cov \
+                     else len(edges_reads_cov[edge])
+            label = ['len' + str(strlen)]
+            
+            assembly_cov, reads_cov = [], []
+            if edge in edges_assembly_cov:
+                assembly_cov = edges_assembly_cov[edge]
+                label.append('assembly_cov' + str(np.median(assembly_cov)))
+            if edge in edges_reads_cov:
+                reads_cov = edges_reads_cov[edge]
+                label.append('reads_cov' + str(np.median(reads_cov)))
+            
+            label = '\n'.join(label)
+            gr.add_edge(nodes_index[edge[:k-1]],
+                        nodes_index[edge[-k+1:]],
+                        string=edge,
+                        assembly_cov=assembly_cov,
+                        reads_cov=reads_cov,
+                        color=color,
+                        label=label)
+    add_edges(edges_reads, color='red')
+    add_edges(edges_assembly, color='blue')
+    add_edges(edges_both, color='green')
+    return gr
+
+
+def collapse_nonbranching_paths_3color(graph, k):
+    def node_on_nonbranching_path(graph, node):
+        colors = nx.get_edge_attributes(graph, 'color')   
+        in_edges = list(graph.in_edges(node, keys=True))
+        out_edges = list(graph.out_edges(node, keys=True))
+        if len(in_edges) != 1 or len(out_edges) != 1:
+            return False
+        in_edge = list(graph.in_edges(node, keys=True))[0]
+        out_edge = list(graph.out_edges(node, keys=True))[0]  
+        return nx.number_of_nodes(graph) > 1 \
+            and graph.in_degree(node) == 1 \
+            and graph.out_degree(node) == 1 \
+            and graph.edges[in_edge]['color'] == graph.edges[out_edge]['color'] \
+
+    for node in list(graph.nodes()):
+        if node_on_nonbranching_path(graph, node):
+            in_edge = list(graph.in_edges(node, keys=True))[0]
+            out_edge = list(graph.out_edges(node, keys=True))[0]
+            in_edge_color = graph.edges[in_edge]['color']
+            out_edge_color = graph.edges[out_edge]['color']
+            assert in_edge_color == out_edge_color
+            in_edge_kmer = graph.edges[in_edge]['string']
+            out_edge_kmer = graph.edges[out_edge]['string']
+            
+            in_edge_cov_reads = graph.edges[in_edge]['reads_cov']
+            out_edge_cov_reads = graph.edges[out_edge]['reads_cov']
+            in_edge_cov_assembly = graph.edges[in_edge]['assembly_cov']
+            out_edge_cov_assembly = graph.edges[out_edge]['assembly_cov']
+            
+            in_node = in_edge[0]
+            out_node = out_edge[1] 
+
+            new_kmer = in_edge_kmer + \
+                out_edge_kmer[-(len(out_edge_kmer)-k+1):]
+            new_cov_reads = sorted(in_edge_cov_reads + out_edge_cov_reads)
+            new_cov_assembly = sorted(in_edge_cov_assembly + out_edge_cov_assembly)
+            if len(new_cov_reads) and len(new_cov_assembly):
+                assert len(new_cov_reads) == len(new_cov_assembly)
+            new_edge_len = max(len(new_cov_reads), len(new_cov_assembly))
+            
+            new_edge_color = in_edge_color # == out_edge_color
+            
+            new_edge_label = ['len' + str(new_edge_len)]
+            if len(new_cov_assembly):
+                new_edge_label.append('assembly_cov' + str(np.median(new_cov_assembly)))
+            if len(new_cov_reads):
+                new_edge_label.append('reads_cov' + str(np.median(new_cov_reads)))
+            new_edge_label = '\n'.join(new_edge_label)
+            
+            graph.add_edge(
+                in_node, out_node,
+                string=new_kmer,
+                assembly_cov=new_cov_assembly,
+                reads_cov=new_cov_reads,
+                length=new_edge_len,
+                label=new_edge_label,
+                color=new_edge_color)
+            graph.remove_node(node)
+    return graph
+
+
+def graph3col(gr_assembly, gr_reads):
+    gr = graph3col_uncompr(gr_assembly, gr_reads)
+    k = gr_assembly.k
+    compr_gr = collapse_nonbranching_paths_3color(gr, k=k)
+    return compr_gr
