@@ -708,8 +708,8 @@ def graph3col_uncompr(gr_assembly, gr_reads):
     gr = nx.MultiDiGraph()
     k = gr_assembly.k
     
-    nodes_assembly = set(gr_assembly.rev_node_mapping[kmer] for kmer in gr_assembly.graph.nodes)
-    nodes_reads = set(gr_reads.rev_node_mapping[kmer] for kmer in gr_reads.graph.nodes)
+    nodes_assembly = set(gr_assembly.rev_node_mapping[i] for i in gr_assembly.graph.nodes)
+    nodes_reads = set(gr_reads.rev_node_mapping[i] for i in gr_reads.graph.nodes)
     nodes_both = nodes_assembly & nodes_reads
     nodes_assembly = nodes_assembly - nodes_both
     nodes_reads = nodes_reads - nodes_both
