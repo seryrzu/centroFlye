@@ -8,8 +8,10 @@ import edlib
 from itertools import groupby
 import os
 import re
+import textwrap
 
 from joblib import Parallel, delayed
+
 from utils.various import weighted_random_by_dct
 
 
@@ -485,3 +487,36 @@ def group_cuts(s1, s2):
     for (st1, en1), (st2, en2) in m_regs:
         assert s1[st1:en1] == s2[st2:en2]
     return m_regs
+
+
+def print_alignment(s1, s2, k=None, mode='NW', width=60):
+    if k is None:
+        k = max(len(s1), len(s2))
+    alignment = edlib.align(s1, s2, task='path', k=k, mode=mode)
+    cigar = alignment['cigar']
+    locs = alignment['locations']
+    st, en = locs[0]
+    _, _, a1, a2 = parse_cigar(cigar, s1, s2[st:])
+    status = []
+    for c1, c2 in zip(a1, a2):
+        if c1 == c2:
+            status.append('|')
+        elif c1 == '-' or c2 == '-':
+            status.append('-')
+        elif c1 != c2:
+            status.append('X')
+        else:
+            assert False
+    a1 = ''.join(a1)
+    status = ''.join(status)
+    a2 = ''.join(a2)
+    
+    a1 = textwrap.wrap(a1, width=width)
+    status = textwrap.wrap(status, width=width)
+    a2 = textwrap.wrap(a2, width=width)
+
+    for wa1, wst, wa2 in zip(a1, status, a2):
+        print(wa1)
+        print(wst)
+        print(wa2)
+        print("")
