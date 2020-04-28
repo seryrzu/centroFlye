@@ -1,3 +1,4 @@
+import os
 import logging
 import unittest
 
@@ -5,12 +6,14 @@ from monomers.monomers import MonomerDB
 
 logger = logging.getLogger("centroFlye.monomers_tests")
 
-MONOMERS_FN = '../../test_dataset/ont/monomers.fasta'
+this_dirname = os.path.dirname(os.path.realpath(__file__))
+monomers_fn = os.path.join(this_dirname, os.path.pardir, os.path.pardir,
+                           'test_dataset', 'ont', 'monomers.fasta')
 
 
 class MonomersTests(unittest.TestCase):
     def test_monomer_db(self):
-        monomer_db = MonomerDB.from_fasta_file(fn=MONOMERS_FN)
+        monomer_db = MonomerDB.from_fasta_file(fn=monomers_fn)
         self.assertEqual(monomer_db.get_total_monomers(), 12)
         self.assertEqual(
             monomer_db.names2ident['A_0_DXZ1*_doubled/1978_2147/R'], 0)
