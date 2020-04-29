@@ -2,7 +2,7 @@ import os
 import logging
 import unittest
 
-from monomers.monomers import MonomerDB
+from monomers.monomer_db import MonomerDB
 
 logger = logging.getLogger("centroFlye.monomers_tests")
 
@@ -12,12 +12,21 @@ monomers_fn = os.path.join(this_dirname, os.path.pardir, os.path.pardir,
 
 
 class MonomersTests(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        self.monomer_db = MonomerDB.from_fasta_file(fn=monomers_fn)
+        super(MonomersTests, self).__init__(*args, **kwargs)
+
     def test_monomer_db(self):
-        monomer_db = MonomerDB.from_fasta_file(fn=monomers_fn)
-        self.assertEqual(monomer_db.get_total_monomers(), 12)
+        self.assertEqual(self.monomer_db.get_total_monomers(), 12)
         self.assertEqual(
-            monomer_db.names2ident['A_0_DXZ1*_doubled/1978_2147/R'], 0)
+            self.monomer_db.id2index['A_0_DXZ1*_doubled/1978_2147/R'], 0)
         self.assertEqual(
-            'A_0_DXZ1*_doubled/1978_2147/R', monomer_db.ident2names[0])
+            'A_0_DXZ1*_doubled/1978_2147/R', self.monomer_db.index2id[0])
         self.assertEqual(
-            len(monomer_db.get_names()), monomer_db.get_total_monomers())
+            len(self.monomer_db.get_ids()),
+                self.monomer_db.get_total_monomers())
+
+        for monomer_id in self.monomer_db.get_ids():
+            index = self.monomer_db.id2index[monomer_id]
+            monomer_id2 = self.monomer_db.index2id[index]
+            self.assertEqual(monomer_id, monomer_id2)

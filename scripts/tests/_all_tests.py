@@ -9,6 +9,7 @@ sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
 
 from monomers_tests import MonomersTests
+from sd_parser_tests import SDParserTests, SDParserWOHPCTests
 from standard_logger import get_logger
 
 

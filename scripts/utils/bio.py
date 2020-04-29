@@ -520,3 +520,37 @@ def print_alignment(s1, s2, k=None, mode='NW', width=60):
         print(wst)
         print(wa2)
         print("")
+        
+
+def __perfect_overlap(s1, s2):
+    assert len(s1) >= len(s2)
+    if s1 == s2:
+        return s1
+
+    longest_overlap = ""
+    for i in range(len(s2)+1):
+        p1, p2 = s1[:i], s2[-i:]
+        if p1 == p2 and len(p1) >= len(longest_overlap):
+            longest_overlap = p1
+    for i in range(len(s1)-len(s2)+1):
+        p1, p2 = s1[i:i+len(s2)], s2
+        if p1 == p2 and len(p1) >= len(longest_overlap):
+            longest_overlap = p1
+    for i in range(len(s2)+1):
+        p1, p2 = s1[-i:], s2[:i]
+        if p1 == p2 and len(p1) >= len(longest_overlap):
+            longest_overlap = p1
+    return longest_overlap
+
+
+def perfect_overlap(s1, s2):
+    return __perfect_overlap(s1, s2) if len(s1) >= len(s2) else __perfect_overlap(s2, s1)
+
+
+# taken from https://stackoverflow.com/a/2894073
+def long_substr(data):
+    substrs = lambda x: {x[i:i+j] for i in range(len(x)) for j in range(len(x) - i + 1)}
+    s = substrs(data[0])
+    for val in data[1:]:
+        s.intersection_update(substrs(val))
+    return max(s, key=len)

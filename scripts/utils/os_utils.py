@@ -32,3 +32,10 @@ def smart_makedirs(dirname):
     except OSError as exc:
         if exc.errno != errno.EEXIST:
             raise exc
+
+
+def expandpath(path):
+    expanduser_path = os.path.expanduser(path)
+    real_path = os.path.realpath(expanduser_path)
+    abs_path = os.path.abspath(real_path)
+    return abs_path
