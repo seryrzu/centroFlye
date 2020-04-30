@@ -39,8 +39,8 @@ class SDParserTests(unittest.TestCase):
     def test_sd_parser(self):
         monostring = list(self.sd_report.monostring_set.monostrings.values())[0]
         monoinstances = monostring.monoinstances
-        self.assertEqual(monoinstances[0].index, 9)
-        self.assertEqual(monoinstances[-3].index, 10)
+        self.assertEqual(monoinstances[0].get_monoindex(), 9)
+        self.assertEqual(monoinstances[-3].get_monoindex(), 10)
         self.assertEqual(monoinstances[0].st, 125)
         self.assertEqual(monoinstances[0].en, 239)
         self.assertEqual(len(monoinstances[0].nucl_segment), 239 - 125)
@@ -62,7 +62,7 @@ class SDParserWOHPCTests(unittest.TestCase):
         mi = monoinstances[2]
         self.assertEqual(mi.st, 464, msg=None)
         self.assertEqual(mi.en, 635, msg=None)
-        self.assertEqual(mi.index, 884)
+        self.assertEqual(mi.get_monoindex(), 884)
         self.assertEqual(monostring.string[2], 884)
         self.assertEqual(nucl_sequence[mi.st:mi.en], mi.nucl_segment, msg=None)
         self.assertTrue(monostring.is_reversed)

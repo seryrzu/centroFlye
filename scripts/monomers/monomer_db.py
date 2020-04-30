@@ -13,9 +13,9 @@ logger = logging.getLogger("centroFlye.monomers.monomer_db")
 
 
 class Monomer:
-    def __init__(self, monomer_id, index, seq):
+    def __init__(self, monomer_id, mono_index, seq):
         self.monomer_id = monomer_id
-        self.index = index
+        self.mono_index = mono_index
         self.seq = seq
 
 
@@ -34,7 +34,9 @@ class MonomerDB:
         index2id = {}
         monomers = []
         for i, (monomer_id, monomer_seq) in enumerate(raw_monomers.items()):
-            monomer = Monomer(monomer_id=monomer_id, index=i, seq=monomer_seq)
+            monomer = Monomer(monomer_id=monomer_id,
+                              mono_index=i,
+                              seq=monomer_seq)
             monomers.append(monomer)
             id2index[monomer_id] = i
             index2id[i] = monomer_id
@@ -47,13 +49,16 @@ class MonomerDB:
         logger.info(f'Finished Creating Monomer DataBase')
         return monomer_db
 
-    def get_seq_by_index(self, index):
-        assert 0 <= index < len(self.monomers)
-        return self.monomers[index].seq
+    def get_monomer_by_id(self, mono_id):
+        return self.monomers[self.id2index[mono_id]]
+
+    def get_seq_by_index(self, mono_index):
+        assert 0 <= mono_index < len(self.monomers)
+        return self.monomers[mono_index].seq
 
     def get_seq_by_id(self, monomer_id):
-        index = self.id2index[monomer_id]
-        return self.monomers[index].seq
+        mono_index = self.id2index[monomer_id]
+        return self.monomers[mono_index].seq
 
     def get_ids(self):
         ids_generator = self.id2index.keys()

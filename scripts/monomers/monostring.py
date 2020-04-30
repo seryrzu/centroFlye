@@ -32,13 +32,11 @@ class Reliability(Enum):
 
 
 class MonoInstance:
-    def __init__(self, monomer_db, index, strand, seq_id, nucl_segment,
+    def __init__(self, monomer, strand, seq_id, nucl_segment,
                  st, en, seq_len,
                  reliability):
-        assert 0 <= index < monomer_db.get_size()
         assert en - st == len(nucl_segment)
-        self.monomer_db = monomer_db
-        self.index = index
+        self.monomer = monomer
         self.strand = strand
         self.seq_id = seq_id
         self.nucl_segment = nucl_segment
@@ -47,11 +45,14 @@ class MonoInstance:
         self.seq_len = seq_len
         self.reliability = reliability
 
-    def get_ref_seq(self):
-        return self.monomer_db.seq[self.index]
+    def get_monoindex(self):
+        return self.monomer.mono_index
 
-    def get_name(self):
-        return self.monomer_db.index2names[self.index]
+    def get_ref_seq(self):
+        return self.monomer.seq
+
+    def get_monoid(self):
+        return self.monomer.mono_id
 
     def is_lowercase(self):
         return self.strand == Strand.REVERSE
@@ -103,12 +104,12 @@ class MonoString:
             indexes, strands = zip(*indexes_strands)
 
             monoinstances = []
-            for i, st, en, mono_id, rel, strand, index in \
-                    zip(count(), starts, ends, ids,
+            for i, st, en, rel, strand, mono_index in \
+                    zip(count(), starts, ends,
                         reliabilities, strands, indexes):
+                monomer = monomer_db.monomers[mono_index]
                 nucl_segment = nucl_sequence[st:en]
-                monoinstance = MonoInstance(monomer_db=monomer_db,
-                                            index=index,
+                monoinstance = MonoInstance(monomer=monomer,
                                             strand=strand,
                                             seq_id=seq_id,
                                             nucl_segment=nucl_segment,
@@ -138,7 +139,7 @@ class MonoString:
         def get_string(monoinstance):
             string = []
             for monoinstance in monoinstances:
-                mono_index = monoinstance.index
+                mono_index = monoinstance.get_monoindex()
                 if monoinstance.reliability == Reliability.RELIABLE:
                     if monoinstance.strand == Strand.FORWARD:
                         string.append(mono_index)
@@ -208,7 +209,7 @@ def assert_monostring_validity(monostring):
     monomer_db_size = monomer_db.get_size()
     monoinsts = monostring.monoinstances
     for i, monoinstance in enumerate(monoinsts):
-        mono_index = monoinstance.index
+        mono_index = monoinstance.get_monoindex()
         if monoinstance.strand == Strand.REVERSE:
             mono_index += monomer_db_size
         if monoinstance.reliability == Reliability.RELIABLE:
