@@ -18,13 +18,15 @@ class MonomersTests(unittest.TestCase):
 
     def test_monomer_db(self):
         self.assertEqual(self.monomer_db.get_size(), 12)
+        mono_id = 'A_0_DXZ1*_doubled/1978_2147/R'
         self.assertEqual(
-            self.monomer_db.id2index['A_0_DXZ1*_doubled/1978_2147/R'], 0)
-        self.assertEqual(
-            'A_0_DXZ1*_doubled/1978_2147/R', self.monomer_db.index2id[0])
-        self.assertEqual(
-            len(self.monomer_db.get_ids()),
-                self.monomer_db.get_size())
+            self.monomer_db.id2index[mono_id], 0)
+        self.assertEqual(mono_id, self.monomer_db.index2id[0])
+        self.assertEqual(len(self.monomer_db.get_ids()),
+                         self.monomer_db.get_size())
+        self.monomer_db.get_seq_by_index(0)
+        self.monomer_db.get_seq_by_id(mono_id)
+        self.monomer_db.get_ids()
 
         for monomer_id in self.monomer_db.get_ids():
             index = self.monomer_db.id2index[monomer_id]
