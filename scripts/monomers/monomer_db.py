@@ -113,7 +113,7 @@ class MonomerDB:
         ids_generator = self.id2index.keys()
         return list(ids_generator)
 
-    def get_total_monomers(self):
+    def get_size(self):
         """
         Method to the total number of monomers
 

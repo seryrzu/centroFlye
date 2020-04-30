@@ -7,12 +7,13 @@ import logging
 import pandas as pd
 
 from monomers.monomer_db import MonomerDB
-from monomers.monostring import MonoString
+from monomers.monostring_set import MonoStringSet
 
 from utils.bio import read_bio_seqs
 from utils.os_utils import expandpath
 
 logger = logging.getLogger("centroFlye.sd_parser.sd_parser")
+
 
 class SD_Report:
     def __init__(self, sd_report_fn, monomers_fn, sequences_fn, hpc=True):
@@ -52,21 +53,13 @@ class SD_Report:
         logger.info('Reading sequences')
         sequences = read_bio_seqs(sequences_fn)
         logger.info('Finished reading sequences')
-
+        monostring_set = MonoStringSet.from_sd_report(report=report,
+                                                      sequences=sequences,
+                                                      monomer_db=monomer_db)
 
         logger.info('Creating monostrings dict')
-        monostrings = {}
-        for seq_id, seq_record in report.groupby('s_id'):
-            seq_record = seq_record.sort_values(by=['s_st'])
-            sequence = sequences[seq_id]
-            monostring = MonoString.from_sd_record(seq_id=seq_id,
-                                                   monomer_db=monomer_db,
-                                                   sd_record=seq_record,
-                                                   sequence=sequence)
-            monostrings[seq_id] = monostring
         logger.info('Finished creating monostrings dict')
 
         self.monomer_db = monomer_db
         self.report = report
-        self.monostrings = monostrings
-
+        self.monostring_set = monostring_set
