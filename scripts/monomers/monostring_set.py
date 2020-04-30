@@ -2,18 +2,23 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+from collections import Counter
 import logging
 
+import numpy as np
+
 from monomers.monostring import MonoString
-from monomers.monostring_correction import correct_monostrings
+from utils.bio import compress_homopolymer
 
 logger = logging.getLogger("centroFlye.monomers.monostring_set")
 
 
 class MonoStringSet:
-    def __init__(self, monostrings, monomer_db):
+    def __init__(self, monostrings, monostrings_filt_out, monomer_db):
         self.monostrings = monostrings
+        self.monostrings_filt_out = monostrings_filt_out
         self.monomer_db = monomer_db
+        self.get_stats()
 
     @classmethod
     def from_sd_report(cls, report, sequences, monomer_db):
@@ -31,7 +36,67 @@ class MonoStringSet:
                                               nucl_sequence=nucl_sequence)
                 monostrings[seq_id] = monostring
             return monostrings
-        raw_monostrings = get_raw_monostrings()
-        monostrings = correct_monostrings(raw_monostrings)
-        monostring_set = cls(monostrings=monostrings, monomer_db=monomer_db)
+
+        def filter_monostrings(monostrings,
+                               max_lowercase=0.1,
+                               max_unreliable=0.4):
+            good_monostrings, bad_monostrings = {}, {}
+            for seq_id, ms in monostrings.items():
+                if ms.get_perc_lowercase() < max_lowercase and \
+                   ms.get_perc_unreliable() < max_unreliable:
+                    good_monostrings[seq_id] = ms
+                else:
+                    bad_monostrings[seq_id] = ms
+            return good_monostrings, bad_monostrings
+
+        unfiltered_monostrings = get_raw_monostrings()
+        monostrings, monostrings_filt_out = \
+            filter_monostrings(unfiltered_monostrings)
+        monostring_set = cls(monostrings=monostrings,
+                             monostrings_filt_out=monostrings_filt_out,
+                             monomer_db=monomer_db)
         return monostring_set
+
+    def get_nucl_seq(self, seq_id):
+        if seq_id in self.monostrings:
+            return self.monostrings[seq_id].nucl_sequence
+        else:
+            assert seq_id in self.monostrings_filt_out
+            return self.monostrings_filt_out[seq_id].nucl_sequence
+
+    def get_stats(self, return_stats=False):
+        def get_ngap_symbols(monostrings, compr_hmp=False):
+            cnt = 0
+            for monostring in monostrings.values():
+                string = monostring.string
+                if compr_hmp:
+                    string = compress_homopolymer(string, return_list=True)
+                char_counter = Counter(string)
+                cnt += char_counter[monostring.gap_symb]
+            return cnt
+
+        stats = {}
+        monostrings = self.monostrings
+        monostrings_filt_out = self.monostrings_filt_out
+        monostrings_lens = [len(monostr) for monostr in monostrings.values()]
+        stats['nmonostrings'] = len(monostrings_lens)
+        stats['nfiltered_out'] = len(monostrings_filt_out)
+        stats['min_len'] = np.min(monostrings_lens)
+        stats['max_len'] = np.max(monostrings_lens)
+        stats['mean_len'] = np.mean(monostrings_lens)
+        stats['tot_len'] = np.sum(monostrings_lens)
+        stats['ngaps'] = get_ngap_symbols(monostrings)
+        stats['pgaps'] = stats['ngaps'] / stats['tot_len']
+        stats['ngap_runs'] = get_ngap_symbols(monostrings, compr_hmp=True)
+
+        logger.info(f'# monostrings: {stats["nmonostrings"]}')
+        logger.info(f'# filtered monostrings: {stats["nfiltered_out"]}')
+        logger.info(f'Min length = {stats["min_len"]}')
+        logger.info(f'Mean length = {stats["mean_len"]}')
+        logger.info(f'Max length = {stats["max_len"]}')
+        logger.info(f'Total length = {stats["tot_len"]}')
+
+        logger.info(f'#(%) Gap symbols = {stats["ngaps"]} ({stats["pgaps"]})')
+        logger.info(f'#Gap runs = {stats["ngap_runs"]}')
+        if return_stats:
+            return stats

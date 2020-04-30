@@ -56,6 +56,9 @@ class MonoInstance:
     def is_lowercase(self):
         return self.strand == Strand.REVERSE
 
+    def is_reliable(self):
+        return self.reliability == Reliability.RELIABLE
+
     def reverse(self):
         self.nucl_segment = RC(self.nucl_segment)
         self.strand = Strand.switch(self.strand)
@@ -146,7 +149,8 @@ class MonoString:
         def reverse_if_needed(monoinstances, nucl_sequence,
                               max_lowercase=0.5):
             is_lowercase = [monoinstance.is_lowercase()
-                            for monoinstance in monoinstances]
+                            for monoinstance in monoinstances
+                            if monoinstance.is_reliable()]
             perc_lower_case = np.mean(is_lowercase)
             is_reversed = perc_lower_case > max_lowercase
             if is_reversed:
@@ -209,6 +213,25 @@ class MonoString:
             sublist = self.string[sub.start:sub.stop:sub.step]
             return sublist
         return self.string[sub]
+
+    def get_perc_reliable(self):
+        is_reliable = [monoinstance.is_reliable()
+                       for monoinstance in self.monoinstances]
+        perc_reliable = np.mean(is_reliable)
+        return perc_reliable
+
+    def get_perc_unreliable(self):
+        return 1 - self.get_perc_reliable()
+
+    def get_perc_lowercase(self):
+        is_lowercase = [monoinstance.is_lowercase()
+                        for monoinstance in self.monoinstances
+                        if monoinstance.is_reliable()]
+        perc_lowercase = np.mean(is_lowercase)
+        return perc_lowercase
+
+    def get_perc_uppercase(self):
+        return 1 - self.get_perc_lowercase()
 
 
 def assert_monostring_validity(monostring):
