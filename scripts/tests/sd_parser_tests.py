@@ -40,13 +40,11 @@ class SDParserTests(unittest.TestCase):
         monostring = list(self.sd_report.monostring_set.monostrings.values())[0]
         monoinstances = monostring.monoinstances
         self.assertEqual(monoinstances[0].index, 9)
-        self.assertEqual(monoinstances[-1].index, 10)
+        self.assertEqual(monoinstances[-3].index, 10)
         self.assertEqual(monoinstances[0].st, 125)
         self.assertEqual(monoinstances[0].en, 239)
         self.assertEqual(len(monoinstances[0].nucl_segment), 239 - 125)
         self.assertFalse(monostring.is_reversed)
-        self.assertEqual(monostring.pref_cut, 1)
-        self.assertEqual(monostring.suf_cut, 4)
 
 
 class SDParserWOHPCTests(unittest.TestCase):
@@ -61,14 +59,10 @@ class SDParserWOHPCTests(unittest.TestCase):
         monostring = list(self.sd_report.monostring_set.monostrings.values())[0]
         nucl_sequence = monostring.nucl_sequence
         monoinstances = monostring.monoinstances
-        self.assertEqual(monostring.pref_cut, 1)
-        self.assertEqual(monostring.suf_cut, 3)
-        self.assertEqual(monoinstances[0].st, 464, msg=None)
-        self.assertEqual(monoinstances[0].en, 635, msg=None)
-        self.assertEqual(monoinstances[0].index, 884)
-        self.assertEqual(monostring.string[0], 884)
-        st = monostring.monoinstances[0].st
-        en = monostring.monoinstances[0].en
-        segment = monoinstances[0].nucl_segment
-        self.assertEqual(nucl_sequence[st:en], segment, msg=None)
+        mi = monoinstances[2]
+        self.assertEqual(mi.st, 464, msg=None)
+        self.assertEqual(mi.en, 635, msg=None)
+        self.assertEqual(mi.index, 884)
+        self.assertEqual(monostring.string[2], 884)
+        self.assertEqual(nucl_sequence[mi.st:mi.en], mi.nucl_segment, msg=None)
         self.assertTrue(monostring.is_reversed)

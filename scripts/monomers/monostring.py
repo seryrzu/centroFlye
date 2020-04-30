@@ -72,47 +72,18 @@ class MonoString:
     reverse_symb = "'"
 
     def __init__(self, seq_id, monoinstances, string, nucl_sequence,
-                 monomer_db, is_reversed,
-                 pref_cut, suf_cut):
+                 monomer_db, is_reversed):
         self.seq_id = seq_id
         self.monoinstances = monoinstances
         self.string = string
         self.nucl_sequence = nucl_sequence
         self.monomer_db = monomer_db
         self.is_reversed = is_reversed
-        self.pref_cut = pref_cut
-        self.suf_cut = suf_cut
         assert_monostring_validity(self)
 
     @classmethod
     def from_sd_record(cls, seq_id, monomer_db, sd_record, nucl_sequence):
-        def trim_unreliable_monomers(sd_record):
-            rels = [Reliability(raw_rel)
-                    for raw_rel in sd_record.reliability]
-            st = 0
-            while st < len(rels) and rels[st] == Reliability.UNRELIABLE:
-                st += 1
-            en = len(rels) - 1
-            while en >= 0 and rels[en] == Reliability.UNRELIABLE:
-                en -= 1
-
-            # Ignore the first and last monomer, as they may be incomplete
-            len_rels = len(rels)
-            st = max(st, 1)
-            en = min(en, len(rels) - 2)
-
-            # trim unreliable monomers
-            sd_record = sd_record[st:en+1]
-            rels = rels[st:en+1]
-
-            pref_cut = st
-            suf_cut = len_rels - 1 - en
-            logger.debug(f'{pref_cut} prefix monomers are UNRELIABLE')
-            logger.debug(f'{suf_cut} suffix monomers are UNRELIABLE')
-            return sd_record, rels, pref_cut, suf_cut
-
-        def get_monoinstances(sd_record, reliabilities,
-                              pref_cut, suf_cut):
+        def get_monoinstances(sd_record):
             def id2index_strand(monomer_id, monomer_db=monomer_db):
                 if monomer_id[-1] == cls.reverse_symb:
                     monomer_id = monomer_id[:-1]
@@ -124,6 +95,8 @@ class MonoString:
 
             starts = sd_record.s_st.to_list()
             ends = [en + 1 for en in sd_record.s_en]
+            reliabilities = [Reliability(raw_rel)
+                             for raw_rel in sd_record.reliability]
 
             ids = sd_record.monomer.to_list()
             indexes_strands = map(id2index_strand, ids)
@@ -179,13 +152,10 @@ class MonoString:
 
         logger.debug(f'Constructing monostring for sequence {seq_id}')
 
-        sd_record, reliabilities, pref_cut, suf_cut = \
-            trim_unreliable_monomers(sd_record)
+        # Trim first and last monomer because they are often unreliable
+        sd_record = sd_record[1:-1]
 
-        monoinstances = get_monoinstances(sd_record=sd_record,
-                                          reliabilities=reliabilities,
-                                          pref_cut=pref_cut,
-                                          suf_cut=suf_cut)
+        monoinstances = get_monoinstances(sd_record=sd_record)
 
         monoinstances, nucl_sequence, is_reversed = \
             reverse_if_needed(monoinstances, nucl_sequence)
@@ -200,9 +170,7 @@ class MonoString:
                          string=string,
                          nucl_sequence=nucl_sequence,
                          monomer_db=monomer_db,
-                         is_reversed=is_reversed,
-                         pref_cut=pref_cut,
-                         suf_cut=suf_cut)
+                         is_reversed=is_reversed)
         return monostring
 
     def __len__(self):
