@@ -36,8 +36,9 @@ class SDParserTests(unittest.TestCase):
                                    sequences_fn=sequences_fn)
         super(SDParserTests, self).__init__(*args, **kwargs)
 
-    def test_sd_parser(self):
-        monostring = list(self.sd_report.monostring_set.monostrings.values())[0]
+    def test_sd_parser_general(self):
+        monostring = list(
+            self.sd_report.monostring_set.monostrings.values())[0]
         monoinstances = monostring.monoinstances
         self.assertEqual(monoinstances[0].get_monoindex(), 9)
         self.assertEqual(monoinstances[-3].get_monoindex(), 10)
@@ -45,6 +46,28 @@ class SDParserTests(unittest.TestCase):
         self.assertEqual(monoinstances[0].en, 239)
         self.assertEqual(len(monoinstances[0].nucl_segment), 239 - 125)
         self.assertFalse(monostring.is_reversed)
+
+    def test_monomerinstances_classification(self):
+        monostring = list(
+            self.sd_report.monostring_set.monostrings.values())[0]
+        monomerinstances_dict = monostring.classify_monomerinstances()
+        self.assertEqual(len(monomerinstances_dict[0]), 1505)
+        self.assertEqual(len(monomerinstances_dict[9]), 1517)
+        monomerinstances_0 = monostring.get_monomerinstances_by_monoindex(0)
+        self.assertEqual(len(monomerinstances_0), 1505)
+        monomerinstances_0_withUnrel = \
+            monostring.get_monomerinstances_by_monoindex(mono_index=0,
+                                                         only_reliable=False)
+        self.assertEqual(len(monomerinstances_0_withUnrel), 1508)
+
+        monostring_set = self.sd_report.monostring_set
+        monomerinstances_dict = monostring_set.classify_monomerinstances()
+        self.assertEqual(len(monomerinstances_dict[0]), 1505)
+        self.assertEqual(len(monomerinstances_dict[9]), 1517)
+        monomerinstances_0_withUnrel = \
+            monostring_set.get_monomerinstances_by_monoindex(mono_index=0,
+                                                             only_reliable=False)
+        self.assertEqual(len(monomerinstances_0_withUnrel), 1508)
 
 
 class SDParserWOHPCTests(unittest.TestCase):
@@ -56,7 +79,8 @@ class SDParserWOHPCTests(unittest.TestCase):
         super(SDParserWOHPCTests, self).__init__(*args, **kwargs)
 
     def test_sd_parser(self):
-        monostring = list(self.sd_report.monostring_set.monostrings.values())[0]
+        monostring = list(
+            self.sd_report.monostring_set.monostrings.values())[0]
         nucl_sequence = monostring.nucl_sequence
         monoinstances = monostring.monoinstances
         mi = monoinstances[2]

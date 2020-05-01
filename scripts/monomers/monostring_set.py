@@ -64,6 +64,22 @@ class MonoStringSet:
             assert seq_id in self.monostrings_filt_out
             return self.monostrings_filt_out[seq_id].nucl_sequence
 
+    def classify_monomerinstances(self, only_reliable=True):
+        monoindexes = self.monomer_db.get_monoindexes()
+        all_monomerinstances_dict = \
+            {monoindex: [] for monoindex in monoindexes}
+        for ms in self.monostrings.values():
+            mi_dict = \
+                ms.classify_monomerinstances(only_reliable=only_reliable)
+            for monoindex in monoindexes:
+                all_monomerinstances_dict[monoindex] += mi_dict[monoindex]
+        return all_monomerinstances_dict
+
+    def get_monomerinstances_by_monoindex(self, mono_index, only_reliable=True):
+        all_monomerinstances_dict = \
+            self.classify_monomerinstances(only_reliable=only_reliable)
+        return all_monomerinstances_dict[mono_index]
+
     def get_stats(self, return_stats=False):
         def get_ngap_symbols(monostrings, compr_hmp=False):
             cnt = 0

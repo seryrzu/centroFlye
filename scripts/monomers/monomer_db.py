@@ -24,6 +24,8 @@ class MonomerDB:
         self.id2index = id2index
         self.index2id = index2id
         self.monomers = monomers
+        for i, monomer in enumerate(self.monomers):
+            assert monomer.mono_index == i
 
     @classmethod
     def from_fasta_file(cls, fn):
@@ -59,6 +61,10 @@ class MonomerDB:
     def get_seq_by_id(self, monomer_id):
         mono_index = self.id2index[monomer_id]
         return self.monomers[mono_index].seq
+
+    def get_monoindexes(self):
+        indexes = self.index2id.keys()
+        return list(indexes)
 
     def get_ids(self):
         ids_generator = self.id2index.keys()

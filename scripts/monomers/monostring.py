@@ -58,7 +58,7 @@ class MonoInstance:
         return self.strand == Strand.REVERSE
 
     def is_reliable(self):
-        return self.reliability == Reliability.RELIABLE
+        return self.reliability is Reliability.RELIABLE
 
     def reverse(self):
         self.nucl_segment = RC(self.nucl_segment)
@@ -201,6 +201,20 @@ class MonoString:
 
     def get_perc_uppercase(self):
         return 1 - self.get_perc_lowercase()
+
+    def classify_monomerinstances(self, only_reliable=True):
+        monoindexes = self.monomer_db.get_monoindexes()
+        monomerinstances_dict = {monoindex: [] for monoindex in monoindexes}
+        for mi in self.monoinstances:
+            if (not only_reliable) or (only_reliable and mi.is_reliable()):
+                monoindex = mi.get_monoindex()
+                monomerinstances_dict[monoindex].append(mi)
+        return monomerinstances_dict
+
+    def get_monomerinstances_by_monoindex(self, mono_index, only_reliable=True):
+        monomerinstances_dict = \
+            self.classify_monomerinstances(only_reliable=only_reliable)
+        return monomerinstances_dict[mono_index]
 
 
 def assert_monostring_validity(monostring):
