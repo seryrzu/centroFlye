@@ -91,7 +91,6 @@ def submonomer_db_extraction(monostring_set, coverage):
         submonomer_seqs = \
             _submonomer_seqs_for_monomer_extraction(nucl_segms, coverage)
         logger.debug(f'    Extracted {len(submonomer_seqs)} submonomers')
-        print(monoindex, len(submonomer_seqs))
 
         monomer = monomer_db.monomers[monoindex]
         submonomers_list = _submonomer_seqs2submonomers(submonomer_seqs,
