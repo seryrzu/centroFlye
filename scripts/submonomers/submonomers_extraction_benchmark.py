@@ -32,8 +32,8 @@ def parse_args():
 
 
 def get_coverage(monoassembly, monoreads_set):
-    assembly_len = len(monoassembly.string)
-    total_reads_len = sum(len(monoread.string)
+    assembly_len = len(monoassembly.raw_monostring)
+    total_reads_len = sum(len(monoread.raw_monostring)
                           for monoread in monoreads_set.monostrings.values())
     return total_reads_len / assembly_len
 

@@ -84,7 +84,7 @@ class MonoStringSet:
         def get_ngap_symbols(monostrings, compr_hmp=False):
             cnt = 0
             for monostring in monostrings.values():
-                string = monostring.string
+                string = monostring.raw_monostring
                 if compr_hmp:
                     string = compress_homopolymer(string, return_list=True)
                 char_counter = Counter(string)

@@ -1,3 +1,7 @@
+# (c) 2020 by Authors
+# This file is a part of centroFlye program.
+# Released under the BSD license (see LICENSE file)
+
 import logging
 
 import os

@@ -87,6 +87,6 @@ class SDParserWOHPCTests(unittest.TestCase):
         self.assertEqual(mi.st, 464, msg=None)
         self.assertEqual(mi.en, 635, msg=None)
         self.assertEqual(mi.get_monoindex(), 884)
-        self.assertEqual(monostring.string[2], 884)
+        self.assertEqual(monostring.raw_monostring[2], 884)
         self.assertEqual(nucl_sequence[mi.st:mi.en], mi.nucl_segment, msg=None)
         self.assertTrue(monostring.is_reversed)

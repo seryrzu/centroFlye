@@ -68,15 +68,15 @@ class MonoInstance:
 
 
 class MonoString:
-    # string is stored as a list because |monomer_db| often exceeds |ascii|
+    # monostring is stored as a list because |monomer_db| often exceeds |ascii|
     gap_symb = '?'
     reverse_symb = "'"
 
-    def __init__(self, seq_id, monoinstances, string, nucl_sequence,
+    def __init__(self, seq_id, monoinstances, raw_monostring, nucl_sequence,
                  monomer_db, is_reversed):
         self.seq_id = seq_id
         self.monoinstances = monoinstances
-        self.string = string
+        self.raw_monostring = raw_monostring
         self.nucl_sequence = nucl_sequence
         self.monomer_db = monomer_db
         self.is_reversed = is_reversed
@@ -151,7 +151,7 @@ class MonoString:
                     string.append(cls.gap_symb)
             return string
 
-        logger.debug(f'Constructing monostring for sequence {seq_id}')
+        logger.debug(f'Constructing raw_monostring for sequence {seq_id}')
 
         # Trim first and last monomer because they are often unreliable
         sd_record = sd_record[1:-1]
@@ -162,26 +162,26 @@ class MonoString:
             reverse_if_needed(monoinstances, nucl_sequence)
         string = get_string(monoinstances)
 
-        logger.debug(f'Finished constructing monostring for sequence {seq_id}')
+        logger.debug(f'Finished constructing raw_monostring for sequence {seq_id}')
         logger.debug(f'    length of string = {len(string)}')
         logger.debug(f'    string: {string}')
 
         monostring = cls(seq_id=seq_id,
                          monoinstances=monoinstances,
-                         string=string,
+                         raw_monostring=string,
                          nucl_sequence=nucl_sequence,
                          monomer_db=monomer_db,
                          is_reversed=is_reversed)
         return monostring
 
     def __len__(self):
-        return self.string.__len__()
+        return self.raw_monostring.__len__()
 
     def __getitem__(self, sub):
         if isinstance(sub, slice):
-            sublist = self.string[sub.start:sub.stop:sub.step]
+            sublist = self.raw_monostring[sub.start:sub.stop:sub.step]
             return sublist
-        return self.string[sub]
+        return self.raw_monostring[sub]
 
     def get_perc_reliable(self):
         is_reliable = [monoinstance.is_reliable()
@@ -211,14 +211,19 @@ class MonoString:
                 monomerinstances_dict[monoindex].append(mi)
         return monomerinstances_dict
 
-    def get_monomerinstances_by_monoindex(self, mono_index, only_reliable=True):
+    def get_monomerinstances_by_monoindex(self, mono_index,
+                                          only_reliable=True):
         monomerinstances_dict = \
             self.classify_monomerinstances(only_reliable=only_reliable)
         return monomerinstances_dict[mono_index]
 
+    def get_nucl_segment(self, st, en):
+        assert 0 <= st < en < len(self.nucl_sequence)
+        return self.nucl_sequence[st:en]
+
 
 def assert_monostring_validity(monostring):
-    string = monostring.string
+    string = monostring.raw_monostring
     monomer_db = monostring.monomer_db
     monomer_db_size = monomer_db.get_size()
     monoinsts = monostring.monoinstances
