@@ -27,6 +27,9 @@ class SubmonomerDB:
         self.submonomers = submonomers
         self.monomer_db = monomer_db
 
+        for i, sm in enumerate(self.submonomers):
+            assert self.submonomers[i].submono_index == i
+
     @classmethod
     def from_monostring_set(cls, monostring_set, coverage):
         return submonomer_db_extraction(monostring_set=monostring_set,
