@@ -6,6 +6,7 @@ import logging
 
 from collections import Counter
 
+from copy import deepcopy
 import edlib
 
 from monomers.monostring import MonoInstance, MonoString
@@ -224,72 +225,87 @@ class CorrectedSubmonoString(SubmonoString):
             assert smindex == raw_submonostring[pos]
 
     @classmethod
-    def from_submonostring(cls, submonostring, k, kmer_index, min_score=3):
-        def gap_pos(string, gap_symb):
-            return [i for i, c in enumerate(string)
-                    if c == submonostring.submonoequiv_symb]
+    def from_submonostring(cls, submonostring, kmer_index, min_score=3):
 
-        def generate_all_closest_kmers(kmer, pos, smindexes):
-            for smindex in smindexes:
-                cor_kmer = kmer
-                cor_kmer[pos] = smindex
-                yield tuple(cor_kmer)
+        def correct_with_k(cor_submonostring, kmer_index_k, k):
+
+            def gap_pos(string, gap_symb):
+                return [i for i, c in enumerate(string)
+                        if c == submonostring.submonoequiv_symb]
+
+            def generate_all_closest_kmers(kmer, pos, smindexes):
+                for smindex in smindexes:
+                    cor_kmer = kmer
+                    cor_kmer[pos] = smindex
+                    yield tuple(cor_kmer)
+
+            qpos = gap_pos(cor_submonostring, equiv_symb)
+            pos2cor = {}
+            while True:
+                qpos = gap_pos(cor_submonostring, equiv_symb)
+                if len(qpos) == 0:
+                    break
+                nonclumpedkmer = {}
+                for i in qpos:
+                    for j in range(max(0, i-k+1),
+                                   min(i, len(cor_submonostring)-k+1)):
+                        kmer = cor_submonostring[j:j+k]
+                        assert len(kmer) == k
+                        assert kmer[i-j] == equiv_symb
+                        nogap = gap_symb not in kmer
+                        oneequiv = Counter(kmer)[equiv_symb] == 1
+                        nosubgap = subgap_symb not in kmer
+                        if nogap and oneequiv and nosubgap:
+                            nonclumpedkmer[i] = j
+                            break
+                cnt = 0
+                for i, j in nonclumpedkmer.items():
+                    kmer = cor_submonostring[j:j+k]
+                    smindexes = \
+                        submonostring.submonoinstances[i].dist2submonomers.keys()
+                    score_kmers = []
+                    for cor_kmer in \
+                            generate_all_closest_kmers(kmer=kmer,
+                                                       pos=i-j,
+                                                       smindexes=smindexes):
+                        if kmer_index_k[cor_kmer] > 0:
+                            score = kmer_index_k[cor_kmer]
+                            score_kmers.append((score, cor_kmer))
+                    if len(score_kmers) == 1:
+                        score, cor_kmer = score_kmers[0]
+                        if score >= min_score:
+                            cor_submonostring[i] = cor_kmer[i-j]
+                            pos2cor[i] = cor_kmer[i-j]
+                            cnt += 1
+                if cnt == 0:
+                    break
+            return cor_submonostring, pos2cor
 
         gap_symb = submonostring.gap_symb
         subgap_symb = submonostring.submonogap_symb
         equiv_symb = submonostring.submonoequiv_symb
-        cor_submonostring = submonostring.raw_submonostring
-        qpos = gap_pos(cor_submonostring, equiv_symb)
-        pos2cor = {}
-        while True:
-            qpos = gap_pos(cor_submonostring, equiv_symb)
-            if len(qpos) == 0:
-                break
-            nonclumpedkmer = {}
-            for i in qpos:
-                for j in range(max(0, i-k+1),
-                               min(i, len(cor_submonostring)-k+1)):
-                    kmer = cor_submonostring[j:j+k]
-                    assert len(kmer) == k
-                    assert kmer[i-j] == equiv_symb
-                    nogap = gap_symb not in kmer
-                    oneequiv = Counter(kmer)[equiv_symb] == 1
-                    nosubgap = subgap_symb not in kmer
-                    if nogap and oneequiv and nosubgap:
-                        nonclumpedkmer[i] = j
-                        break
-            cnt = 0
-            for i, j in nonclumpedkmer.items():
-                kmer = cor_submonostring[j:j+k]
-                smindexes = \
-                    submonostring.submonoinstances[i].dist2submonomers.keys()
-                score_kmers = []
-                for cor_kmer in generate_all_closest_kmers(kmer=kmer,
-                                                           pos=i-j,
-                                                           smindexes=smindexes):
-                    if kmer_index[cor_kmer] > 0:
-                        score = kmer_index[cor_kmer]
-                        score_kmers.append((score, cor_kmer))
-                if len(score_kmers) == 1:
-                    score, cor_kmer = score_kmers[0]
-                    if score >= min_score:
-                        cor_submonostring[i] = cor_kmer[i-j]
-                        pos2cor[i] = cor_kmer[i-j]
-                        cnt += 1
-            if cnt == 0:
-                break
 
-        print(submonostring.raw_submonostring)
-        print(cor_submonostring)
+        cor_submonostring = deepcopy(submonostring.raw_submonostring)
+        cor_pos2submonoindex = {}
+
+        mink = min(kmer_index.keys())
+        maxk = max(kmer_index.keys())
+
+        for k in range(maxk, mink-1, -1):
+            cor_submonostring, pos2cor = correct_with_k(cor_submonostring,
+                                                        kmer_index[k],
+                                                        k=k)
+            cor_pos2submonoindex.update(pos2cor)
+
+        submonoinstances = submonostring.submonoinstances
         cor_submonostring = cls(seq_id=submonostring.seq_id,
                                 monoinstances=submonostring.monoinstances,
                                 raw_monostring=submonostring.raw_monostring,
                                 nucl_sequence=submonostring.nucl_sequence,
                                 monomer_db=submonostring.monomer_db,
                                 is_reversed=submonostring.is_reversed,
-                                submonoinstances=submonostring.submonoinstances,
+                                submonoinstances=submonoinstances,
                                 raw_submonostring=cor_submonostring,
                                 submonomer_db=submonostring.submonomer_db,
-                                cor_pos2submonoindex=pos2cor)
-        print(pos2cor)
+                                cor_pos2submonoindex=cor_pos2submonoindex)
         return cor_submonostring

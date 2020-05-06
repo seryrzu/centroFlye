@@ -7,7 +7,7 @@ import logging
 from collections import Counter
 
 from joblib import Parallel, delayed
-from submonomers.submonostring import SubmonoString
+from submonomers.submonostring import SubmonoString, CorrectedSubmonoString
 
 logger = logging.getLogger('centroFlye.submonomers.submonostring_set')
 
@@ -44,3 +44,28 @@ class SubmonoStringSet:
                 for kmer, cnt in sms_index[k].items():
                     kmer_index[k][kmer] += cnt
         return kmer_index
+
+
+class CorrectedSubmonoStringSet:
+    def __init__(self, cor_submonostrings, submonomer_db):
+        self.cor_submonostrings = cor_submonostrings
+        self.submonomer_db = submonomer_db
+
+    @classmethod
+    def from_submonostring_set(cls, submonostring_set, mink=3, maxk=50):
+        logger.info(f'Constructing kmer index for mink={mink}, maxk={maxk}')
+        kmer_index = submonostring_set.get_submonokmer_index(mink=mink,
+                                                             maxk=maxk)
+        logger.info('Finished constructing kmer index')
+        logger.info('Correcting submonostrings')
+        cor_submonostrings = {}
+        for seq_id, submonostring in submonostring_set.submonostrings.items():
+            cor_submonostring = \
+                CorrectedSubmonoString.from_submonostring(submonostring,
+                                                          kmer_index)
+            cor_submonostrings[seq_id] = cor_submonostring
+        logger.info('Finished correcting submonostrings')
+        cor_submonostring_set = \
+            cls(cor_submonostrings=cor_submonostrings,
+                submonomer_db=submonostring_set.submonomer_db)
+        return cor_submonostring_set
