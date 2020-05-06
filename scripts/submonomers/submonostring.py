@@ -4,6 +4,8 @@
 
 import logging
 
+from collections import Counter
+
 import edlib
 
 from monomers.monostring import MonoInstance, MonoString
@@ -185,3 +187,109 @@ class SubmonoString(MonoString):
                             raw_submonostring=raw_submonostring,
                             submonomer_db=submonomer_db)
         return submonostring
+
+    def get_gap_symbols(self):
+        return {self.gap_symb, self.submonogap_symb, self.submonoequiv_symb}
+
+    def get_submonokmer_index(self, mink, maxk):
+        assert 0 < mink <= maxk
+        kmerindex = {}
+        for k in range(mink, maxk+1):
+            kmerindex[k] = Counter()
+            for i in range(len(self.raw_submonostring)-k+1):
+                kmer = self.raw_submonostring[i:i+k]
+                if len(set(kmer) & self.get_gap_symbols()) == 0:
+                    kmer = tuple(kmer)
+                    kmerindex[k][kmer] += 1
+        return kmerindex
+
+
+class CorrectedSubmonoString(SubmonoString):
+    def __init__(self, seq_id, monoinstances, raw_monostring, nucl_sequence,
+                 monomer_db, is_reversed,
+                 submonoinstances, raw_submonostring, submonomer_db,
+                 cor_pos2submonoindex):
+        super().__init__(seq_id=seq_id,
+                         monoinstances=monoinstances,
+                         raw_monostring=raw_monostring,
+                         nucl_sequence=nucl_sequence,
+                         monomer_db=monomer_db,
+                         is_reversed=is_reversed,
+                         submonoinstances=submonoinstances,
+                         raw_submonostring=raw_submonostring,
+                         submonomer_db=submonomer_db)
+        self.cor_pos2submonoindex = cor_pos2submonoindex
+
+        for pos, smindex in cor_pos2submonoindex.items():
+            assert smindex == raw_submonostring[pos]
+
+    @classmethod
+    def from_submonostring(cls, submonostring, k, kmer_index, min_score=3):
+        def gap_pos(string, gap_symb):
+            return [i for i, c in enumerate(string)
+                    if c == submonostring.submonoequiv_symb]
+
+        def generate_all_closest_kmers(kmer, pos, smindexes):
+            for smindex in smindexes:
+                cor_kmer = kmer
+                cor_kmer[pos] = smindex
+                yield tuple(cor_kmer)
+
+        gap_symb = submonostring.gap_symb
+        subgap_symb = submonostring.submonogap_symb
+        equiv_symb = submonostring.submonoequiv_symb
+        cor_submonostring = submonostring.raw_submonostring
+        qpos = gap_pos(cor_submonostring, equiv_symb)
+        pos2cor = {}
+        while True:
+            qpos = gap_pos(cor_submonostring, equiv_symb)
+            if len(qpos) == 0:
+                break
+            nonclumpedkmer = {}
+            for i in qpos:
+                for j in range(max(0, i-k+1),
+                               min(i, len(cor_submonostring)-k+1)):
+                    kmer = cor_submonostring[j:j+k]
+                    assert len(kmer) == k
+                    assert kmer[i-j] == equiv_symb
+                    nogap = gap_symb not in kmer
+                    oneequiv = Counter(kmer)[equiv_symb] == 1
+                    nosubgap = subgap_symb not in kmer
+                    if nogap and oneequiv and nosubgap:
+                        nonclumpedkmer[i] = j
+                        break
+            cnt = 0
+            for i, j in nonclumpedkmer.items():
+                kmer = cor_submonostring[j:j+k]
+                smindexes = \
+                    submonostring.submonoinstances[i].dist2submonomers.keys()
+                score_kmers = []
+                for cor_kmer in generate_all_closest_kmers(kmer=kmer,
+                                                           pos=i-j,
+                                                           smindexes=smindexes):
+                    if kmer_index[cor_kmer] > 0:
+                        score = kmer_index[cor_kmer]
+                        score_kmers.append((score, cor_kmer))
+                if len(score_kmers) == 1:
+                    score, cor_kmer = score_kmers[0]
+                    if score >= min_score:
+                        cor_submonostring[i] = cor_kmer[i-j]
+                        pos2cor[i] = cor_kmer[i-j]
+                        cnt += 1
+            if cnt == 0:
+                break
+
+        print(submonostring.raw_submonostring)
+        print(cor_submonostring)
+        cor_submonostring = cls(seq_id=submonostring.seq_id,
+                                monoinstances=submonostring.monoinstances,
+                                raw_monostring=submonostring.raw_monostring,
+                                nucl_sequence=submonostring.nucl_sequence,
+                                monomer_db=submonostring.monomer_db,
+                                is_reversed=submonostring.is_reversed,
+                                submonoinstances=submonostring.submonoinstances,
+                                raw_submonostring=cor_submonostring,
+                                submonomer_db=submonostring.submonomer_db,
+                                cor_pos2submonoindex=pos2cor)
+        print(pos2cor)
+        return cor_submonostring
