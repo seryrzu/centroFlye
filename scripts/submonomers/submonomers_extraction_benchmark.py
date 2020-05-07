@@ -70,7 +70,7 @@ def benchmark_read_submonomers_recruitment(assembly_submonomers, reads_submonome
     perfect_overlap_cnt = 0
     for monomer in absent:
         dist, perf_overlap_submonomers = \
-            get_closest_submonomer(monomer,reads_submonomers)
+            get_closest_submonomer(monomer, reads_submonomers)
         if len(perf_overlap_submonomers) == 1:
             perfect_overlap_cnt += 1
     stats['perfect overlap'] = perfect_overlap_cnt
