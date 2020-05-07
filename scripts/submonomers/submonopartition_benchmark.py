@@ -246,6 +246,7 @@ def main():
     logger.info('Checking equivocal submonomer instances')
     iscorrectsubmonomerclosest(mappings=mappings,
                                submonoread_set=submonoread_set,
+                               cor_submonoread_set=cor_submonoread_set,
                                submonoassembly=submonoassembly,
                                logger=logger)
 
