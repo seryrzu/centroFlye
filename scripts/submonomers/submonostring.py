@@ -75,6 +75,7 @@ class SubmonoString(MonoString):
                          monomer_db=monomer_db,
                          is_reversed=is_reversed)
         assert len(submonoinstances) == len(raw_submonostring)
+        assert len(raw_monostring) == len(raw_submonostring)
         self.submonoinstances = submonoinstances
         self.raw_submonostring = raw_submonostring
         self.submonomer_db = submonomer_db
@@ -203,6 +204,12 @@ class SubmonoString(MonoString):
                     kmer = tuple(kmer)
                     kmerindex[k][kmer] += 1
         return kmerindex
+
+    def __getitem__(self, sub):
+        if isinstance(sub, slice):
+            sublist = self.raw_submonostring[sub.start:sub.stop:sub.step]
+            return sublist
+        return self.raw_submonostring[sub]
 
 
 class CorrectedSubmonoString(SubmonoString):

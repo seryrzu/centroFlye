@@ -45,6 +45,9 @@ class SubmonoStringSet:
                     kmer_index[k][kmer] += cnt
         return kmer_index
 
+    def __getitem__(self, sub):
+        return self.submonostrings[sub]
+
 
 class CorrectedSubmonoStringSet:
     def __init__(self, cor_submonostrings, submonomer_db):
@@ -69,3 +72,6 @@ class CorrectedSubmonoStringSet:
             cls(cor_submonostrings=cor_submonostrings,
                 submonomer_db=submonostring_set.submonomer_db)
         return cor_submonostring_set
+
+    def __getitem__(self, sub):
+        return self.cor_submonostrings[sub]
