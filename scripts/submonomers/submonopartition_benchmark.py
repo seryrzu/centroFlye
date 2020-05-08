@@ -4,6 +4,7 @@
 
 
 import argparse
+from collections import Counter
 import os
 import sys
 
@@ -23,7 +24,6 @@ from submonomers.submonomers_extraction_benchmark import get_coverage
 from submonomers.submonostring_set import SubmonoStringSet,\
                                           CorrectedSubmonoStringSet
 from utils.os_utils import smart_makedirs
-
 
 
 def parse_args():
@@ -104,15 +104,16 @@ def map_reads(submonoread_set, submonoassembly, n_jobs=30):
     return mappings
 
 
-def estimate_rates_over_assembly(mappings,
-                                 submonoassembly,
-                                 submonoread_set,
-                                 min_ident=0.3,
-                                 min_cov=5):
+def estimate_rates(mappings, submonoassembly, submonoread_set,
+                   min_ident=0.3, min_cov=5):
     assembly_len = len(submonoassembly)
-    errors = np.zeros(assembly_len)
-    submonoequiv = np.zeros(assembly_len)
-    coverage = np.zeros(assembly_len)
+    errors_asm = np.zeros(assembly_len)
+    submonoequiv_asm = np.zeros(assembly_len)
+    coverage_asm = np.zeros(assembly_len)
+
+    errors_subm = Counter()
+    submonoequiv_subm = Counter()
+    coverage_subm = Counter()
 
     gap_symbols = submonoassembly.get_gap_symbols()
     for r_id, p in mappings.items():
@@ -126,65 +127,106 @@ def estimate_rates_over_assembly(mappings,
             continue
         for i, (cr, ca) in enumerate(zip(submonoread, a_smsubstr)):
             ia = i + p
-            coverage[ia] += 1
+            coverage_asm[ia] += 1
+            coverage_subm[ca] += 1
             if cr != ca and cr not in gap_symbols:
-                errors[ia] += 1
+                errors_asm[ia] += 1
+                errors_subm[ca] += 1
             if cr == submonoread.submonoequiv_symb:
-                submonoequiv[ia] += 1
+                submonoequiv_asm[ia] += 1
+                submonoequiv_subm[ca] += 1
 
-    error_rate = errors / coverage
-    error_rate[coverage < min_cov] = 0
+    def norm_numpy(array, cov, min_cov=min_cov):
+        rate = array / cov
+        rate[cov < min_cov]=0
+        return rate
 
-    submonoequiv_rate = submonoequiv / coverage
-    submonoequiv_rate[coverage < min_cov] = 0
+    error_rate_asm = norm_numpy(errors_asm, coverage_asm)
+    submonoequiv_rate_asm = norm_numpy(submonoequiv_asm, coverage_asm)
 
-    return coverage, error_rate, submonoequiv_rate
+    def norm_dict(vals, cov, min_cov=min_cov):
+        return {k: vals[k] / cov[k] for k in vals.keys()
+                if cov[k] >= min_cov}
+
+    error_rate_subm = norm_dict(errors_subm, coverage_subm)
+    submonoequiv_rate_subm = norm_dict(submonoequiv_subm, coverage_subm)
+
+    return coverage_asm,  error_rate_asm,  submonoequiv_rate_asm, \
+           coverage_subm, error_rate_subm, submonoequiv_rate_subm
 
 
 def run_rate_stats(mappings, submonoassembly, submonoread_set,
                    cor_submonoread_set, outdir, logger):
-    coverage, error_rate, submonoequiv_rate = \
-        estimate_rates_over_assembly(mappings,
-                                     submonoassembly,
-                                     submonoread_set)
-    plt.plot(coverage)
+    coverage_asm, error_rate_asm, submonoequiv_rate_asm, \
+        coverage_subm, error_rate_subm, submonoequiv_rate_subm = \
+        estimate_rates(mappings,
+                       submonoassembly,
+                       submonoread_set)
+    plt.plot(coverage_asm)
     plt.title('Coverage with uniquely mapped reads')
-    plt.savefig(os.path.join(outdir, 'coverage.pdf'), format='pdf')
+    plt.savefig(os.path.join(outdir, 'coverage_asm.pdf'), format='pdf')
     plt.close()
 
-    zero_cov = np.where(coverage == 0)[0]
-    logger.info(f'Positions of zero coverage {zero_cov}')
+    _, cor_error_rate_asm, cor_submonoequiv_rate_asm, \
+        cor_coverage_subm, cor_error_rate_subm, cor_submonoequiv_rate_subm = \
+        estimate_rates(mappings,
+                       submonoassembly,
+                       cor_submonoread_set)
 
-    plt.plot(error_rate)
+    plt.plot(error_rate_asm, alpha=0.7)
+    plt.plot(cor_error_rate_asm, alpha=0.7)
     plt.title('Error rate')
+    plt.legend(['Before correction', 'After correction'])
     plt.savefig(os.path.join(outdir, 'error_rate_assembly.pdf'), format='pdf')
     plt.close()
 
-    high_error_rate = np.where(np.logical_and(error_rate > 0.9, coverage > 5))
-    logger.info(f'Positions of high error rate {high_error_rate}')
-
-    _, _, cor_submonoequiv_rate = \
-        estimate_rates_over_assembly(mappings,
-                                     submonoassembly,
-                                     cor_submonoread_set)
-
-    plt.plot(submonoequiv_rate, alpha=0.7)
-    plt.plot(cor_submonoequiv_rate, alpha=0.7)
+    plt.plot(submonoequiv_rate_asm, alpha=0.7)
+    plt.plot(cor_submonoequiv_rate_asm, alpha=0.7)
     plt.title('Submonoequivocal rate')
     plt.legend(['Before correction', 'After correction'])
     plt.savefig(os.path.join(outdir, 'submonoequiv_assembly.pdf'),
                 format='pdf')
     plt.close()
 
-    high_equiv_rate = np.where(np.logical_and(submonoequiv_rate > 0.9,
-                                              coverage > 5))
+    plt.hist(error_rate_subm.values(), bins=100, alpha=0.7)
+    plt.hist(cor_error_rate_subm.values(), bins=100, alpha=0.7)
+    plt.yscale('log')
+    plt.title('Histogram of Error Rate per monomer')
+    plt.xlabel('Error rate')
+    plt.ylabel('Count (log)')
+    plt.legend(['Before correction', 'After correction'])
+    plt.savefig(os.path.join(outdir, 'error_rate_per_submonomer.pdf'),
+                format='pdf')
+    plt.close()
+
+
+    plt.hist(submonoequiv_rate_subm.values(), bins=100, alpha=0.7)
+    plt.hist(cor_submonoequiv_rate_subm.values(), bins=100, alpha=0.7)
+    plt.yscale('log')
+    plt.title('Histogram of Submonoequivocal Rate per monomer')
+    plt.xlabel('Error rate')
+    plt.ylabel('Count (log)')
+    plt.legend(['Before correction', 'After correction'])
+    plt.savefig(os.path.join(outdir, 'submonoequiv_rate_per_submonomer.pdf'),
+                format='pdf')
+    plt.close()
+
+    zero_cov = np.where(coverage_asm == 0)[0]
+    logger.info(f'Positions of zero coverage {zero_cov}')
+
+    high_error_rate = np.where(np.logical_and(error_rate_asm > 0.9, coverage_asm > 5))
+
+    logger.info(f'Positions of high error rate {high_error_rate}')
+
+    high_equiv_rate = np.where(np.logical_and(submonoequiv_rate_asm > 0.9,
+                                              coverage_asm > 5))
     logger.info(f'Positions of high submonoequiv rate {high_equiv_rate}')
-    high_cor_equiv_rate = np.where(np.logical_and(cor_submonoequiv_rate > 0.9,
-                                                  coverage > 5))
+    high_cor_equiv_rate = np.where(np.logical_and(cor_submonoequiv_rate_asm > 0.9,
+                                                  coverage_asm > 5))
     logger.info(f'Positions of high cor submonoequiv rate {high_cor_equiv_rate}')
-    logger.info(f'Error rate            [50, 55, 60, 90, 95]%: {np.percentile(error_rate, [50, 55, 60, 90, 95])}')
-    logger.info(f'Submonoequiv rate     [50, 55, 60, 90, 95]%: {np.percentile(submonoequiv_rate, [50, 55, 60, 90, 95])}')
-    logger.info(f'Cor submonoequiv rate [50, 55, 60, 90, 95]%: {np.percentile(cor_submonoequiv_rate, [50, 55, 60, 90, 95])}')
+    logger.info(f'Error rate            [50, 55, 60, 90, 95]%: {np.percentile(error_rate_asm, [50, 55, 60, 90, 95])}')
+    logger.info(f'Submonoequiv rate     [50, 55, 60, 90, 95]%: {np.percentile(submonoequiv_rate_asm, [50, 55, 60, 90, 95])}')
+    logger.info(f'Cor submonoequiv rate [50, 55, 60, 90, 95]%: {np.percentile(cor_submonoequiv_rate_asm, [50, 55, 60, 90, 95])}')
 
 
 def iscorrectsubmonomerclosest(mappings,
