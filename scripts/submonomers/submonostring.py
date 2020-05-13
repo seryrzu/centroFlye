@@ -10,6 +10,7 @@ from copy import deepcopy
 import edlib
 
 from monomers.monostring import MonoInstance, MonoString
+from utils.various import list2str
 
 logger = logging.getLogger("centroFlye.submonomers.submonostring")
 
@@ -210,6 +211,54 @@ class SubmonoString(MonoString):
             sublist = self.raw_submonostring[sub.start:sub.stop:sub.step]
             return sublist
         return self.raw_submonostring[sub]
+
+    def to_tsv(self, filename, mode='w', sep='\t', print_header=True):
+        seq_id = self.seq_id
+        is_reversed = self.is_reversed
+        with open(filename, mode=mode) as f:
+            if print_header:
+                header = ['seq_id', 'is_seq_reversed', 'submonochar',
+                          'st', 'en', 'monoindex', 'monomer_id',
+                          'mono_strand', 'mono_reliability',
+                          'submono_is_identified', 'submono_is_unequivocal',
+                          'nucl_segment']
+                print(sep.join(header), file=f)
+
+            for i, c in enumerate(self.raw_submonostring):
+                sminst = self.submonoinstances[i]
+
+                line = []
+                line.append(seq_id)
+                line.append(is_reversed)
+
+                line.append(c)
+
+                st, en = sminst.st, sminst.en
+                line.append(st)
+                line.append(en)
+
+                monoindex = sminst.get_monoindex()
+                line.append(monoindex)
+                monomer_id = sminst.get_monoid()
+                line.append(monomer_id)
+
+                strand = sminst.strand
+                line.append(strand.value)
+
+                reliability = sminst.reliability
+                line.append(reliability.value)
+
+                sm_is_identified = sminst.is_identified()
+                line.append(sm_is_identified)
+
+                sm_is_unequivocal = sminst.is_unequivocal()
+                line.append(sm_is_unequivocal)
+
+                nucl_segment = sminst.nucl_segment
+                line.append(nucl_segment)
+
+                line = list2str(line, sep=sep)
+                print(line, file=f)
 
 
 class CorrectedSubmonoString(SubmonoString):
