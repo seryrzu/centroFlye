@@ -152,7 +152,7 @@ def main():
             coverage=params.coverage)
     submonomer_db_fn = os.path.join(params.outdir, 'submonomer_db.fasta')
     logger.info('Finished extracting')
-    logger.info(f'Exporing to {submonomer_db_fn}')
+    logger.info(f'Exporing database to {submonomer_db_fn}')
     submonomer_db.to_fasta(filename=submonomer_db_fn)
 
 

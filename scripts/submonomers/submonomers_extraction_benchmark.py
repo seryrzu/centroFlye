@@ -15,8 +15,8 @@ import edlib
 from sd_parser.sd_parser import SD_Report
 from standard_logger import get_logger
 from submonomers.submonomer_db import SubmonomerDB
-from utils.os_utils import smart_makedirs
 from utils.bio import perfect_overlap
+from utils.os_utils import smart_makedirs, expandpath
 
 
 def parse_args():
@@ -28,6 +28,12 @@ def parse_args():
     parser.add_argument("--assembly", required=True)
     parser.add_argument("--outdir", required=True)
     params = parser.parse_args()
+    params.sd_report_reads = expandpath(params.sd_report_reads)
+    params.sd_report_assembly = expandpath(params.sd_report_assembly)
+    params.monomers = expandpath(params.monomers)
+    params.reads = expandpath(params.reads)
+    params.assembly = expandpath(params.assembly)
+    params.outdir = expandpath(params.outdir)
     return params
 
 
@@ -131,11 +137,12 @@ def main():
     coverage = get_coverage(monoassembly, monoreads_set)
     logger.info(f'Estimated coverage = {coverage:.5}x')
 
-    logger.info(f'Extracting submonomers from the reads')
+    logger.info(f'Extracting submonomer_db from the reads')
     submonomers_reads = SubmonomerDB.from_monostring_set(monoreads_set,
                                                          coverage=coverage)
     submonomers_reads_fn = os.path.join(params.outdir,
-                                        'submonomer_db_reads.fasta)
+                                        'submonomer_db_reads.fasta')
+    logger.info(f'Exporting submonomer_reads_db to {submonomers_reads_fn}')
     submonomers_reads.to_fasta(submonomers_reads_fn)
 
     logger.info(f'Extracting submonomers from the assembly')
@@ -143,7 +150,8 @@ def main():
         SubmonomerDB.from_monostring_set(sd_report_assembly.monostring_set,
                                          coverage=1)
     submonomers_assembly_fn = os.path.join(params.outdir,
-                                           'submonomer_db_reads.fasta)
+                                           'submonomer_db_assembly.fasta')
+    logger.info(f'Exporting submonomer_assem_db to {submonomers_assembly_fn}')
     submonomers_assembly.to_fasta(submonomers_assembly_fn)
 
     benchmark(submonomers_reads=submonomers_reads,
