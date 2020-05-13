@@ -48,6 +48,7 @@ class SubmonomerDB:
         return self.get_submonomers_by_mono_index(mono_index)
 
     def to_fasta(self, filename):
+        logger.info(f'Exporting the submono database to {filename}')
         ready_for_export = {}
         for sm in self.submonomers:
             smi = sm.submono_index

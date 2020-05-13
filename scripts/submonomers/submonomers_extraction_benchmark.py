@@ -134,10 +134,18 @@ def main():
     logger.info(f'Extracting submonomers from the reads')
     submonomers_reads = SubmonomerDB.from_monostring_set(monoreads_set,
                                                          coverage=coverage)
+    submonomers_reads_fn = os.path.join(params.outdir,
+                                        'submonomer_db_reads.fasta)
+    submonomers_reads.to_fasta(submonomers_reads_fn)
+
     logger.info(f'Extracting submonomers from the assembly')
     submonomers_assembly = \
         SubmonomerDB.from_monostring_set(sd_report_assembly.monostring_set,
                                          coverage=1)
+    submonomers_assembly_fn = os.path.join(params.outdir,
+                                           'submonomer_db_reads.fasta)
+    submonomers_assembly.to_fasta(submonomers_assembly_fn)
+
     benchmark(submonomers_reads=submonomers_reads,
               submonomers_assembly=submonomers_assembly,
               logger=logger)

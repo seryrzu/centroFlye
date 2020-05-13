@@ -15,8 +15,10 @@ import edlib
 import networkx as nx
 
 from sd_parser.sd_parser import SD_Report
+from standard_logger import get_logger
 import submonomers.submonomer_db
 from utils.bio import perfect_overlap, long_substr
+from utils.os_utils import smart_makedirs, expandpath
 
 logger = logging.getLogger("centroFlye.submonomers.submonomer_extraction")
 
@@ -116,24 +118,42 @@ def _parse_args():
     parser.add_argument("--sd-report", required=True)
     parser.add_argument("--monomers", required=True)
     parser.add_argument("--sequences", required=True)
-    parser.add_argument("--outfile", required=True)
+    parser.add_argument("--outdir", required=True)
     parser.add_argument("--coverage", type=int, required=True)
     params = parser.parse_args()
+    params.sd_report = expandpath(params.sd_report)
+    params.monomers = expandpath(params.monomers)
+    params.sequences = expandpath(params.sequences)
+    params.outdir = expandpath(params.outdir)
     return params
 
 
 def main():
     params = _parse_args()
-    logger.info('Reading SD report')
+    smart_makedirs(params.outdir)
+
+    logfile = os.path.join(params.outdir, 'extraction.log')
+    logger = get_logger(logfile,
+                        logger_name="centroFlye: submonomers_extraction")
+
+    logger.info('Reading SD Report')
+    logger.info(f'    sd_report_fn = {params.sd_report}')
+    logger.info(f'    monomers_fn  = {params.monomers}')
+    logger.info(f'    sequences_fn = {params.sequences}')
     sd_report = SD_Report(sd_report_fn=params.sd_report,
                           sequences_fn=params.sequences,
                           monomers_fn=params.monomers)
     logger.info('Finished reading SD report')
+
+    logger.info(f'Extracting submonomer db with coverage = {params.coverage}')
     submonomer_db = \
         submonomers.submonomer_db.SubmonomerDB.from_monostring_set(
             sd_report.monostring_set,
             coverage=params.coverage)
-    submonomer_db.to_fasta(filename=params.outfile)
+    submonomer_db_fn = os.path.join(params.outdir, 'submonomer_db.fasta')
+    logger.info('Finished extracting')
+    logger.info(f'Exporing to {submonomer_db_fn}')
+    submonomer_db.to_fasta(filename=submonomer_db_fn)
 
 
 if __name__ == "__main__":
