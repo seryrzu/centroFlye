@@ -5,6 +5,7 @@
 import logging
 
 from submonomers.submonomers_extraction import submonomer_db_extraction
+from utils.bio import write_bio_seqs
 
 logger = logging.getLogger("centroFlye.submonomers.submonomer_db")
 
@@ -45,3 +46,13 @@ class SubmonomerDB:
     def get_submonomers_by_monomer_id(self, monomer_id):
         mono_index = self.monomer_db.id2index[monomer_id]
         return self.get_submonomers_by_mono_index(mono_index)
+
+    def to_fasta(self, filename):
+        ready_for_export = {}
+        for sm in self.submonomers:
+            smi = sm.submono_index
+            mi = sm.get_monoindex()
+            mid = sm.get_monomerid()
+            fasta_id = f'submono_index={smi}|mono_index={mi}|monomer_id={mid}'
+            ready_for_export[fasta_id] = sm.seq
+        write_bio_seqs(filename, ready_for_export)

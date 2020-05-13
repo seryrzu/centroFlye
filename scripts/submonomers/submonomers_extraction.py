@@ -2,12 +2,19 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+import argparse
 from collections import Counter
 import logging
+import os
+import sys
+
+this_dirname = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
 import edlib
 import networkx as nx
 
+from sd_parser.sd_parser import SD_Report
 import submonomers.submonomer_db
 from utils.bio import perfect_overlap, long_substr
 
@@ -102,3 +109,32 @@ def submonomer_db_extraction(monostring_set, coverage):
         submonomers.submonomer_db.SubmonomerDB(submonomers=all_submonomers,
                                                monomer_db=monomer_db)
     return submonomer_db
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sd-report", required=True)
+    parser.add_argument("--monomers", required=True)
+    parser.add_argument("--sequences", required=True)
+    parser.add_argument("--outfile", required=True)
+    parser.add_argument("--coverage", type=int, required=True)
+    params = parser.parse_args()
+    return params
+
+
+def main():
+    params = _parse_args()
+    logger.info('Reading SD report')
+    sd_report = SD_Report(sd_report_fn=params.sd_report,
+                          sequences_fn=params.sequences,
+                          monomers_fn=params.monomers)
+    logger.info('Finished reading SD report')
+    submonomer_db = \
+        submonomers.submonomer_db.SubmonomerDB.from_monostring_set(
+            sd_report.monostring_set,
+            coverage=params.coverage)
+    submonomer_db.to_fasta(filename=params.outfile)
+
+
+if __name__ == "__main__":
+    main()
