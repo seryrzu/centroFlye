@@ -52,7 +52,7 @@ class MonoInstance:
         return self.monomer.seq
 
     def get_monoid(self):
-        return self.monomer.mono_id
+        return self.monomer.monomer_id
 
     def is_lowercase(self):
         return self.strand == Strand.REVERSE
