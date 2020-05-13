@@ -17,10 +17,6 @@ logger = logging.getLogger("centroFlye.sd_parser.sd_parser")
 
 class SD_Report:
     def __init__(self, sd_report_fn, monomers_fn, sequences_fn, hpc=True):
-        sd_report_fn = expandpath(sd_report_fn)
-        monomers_fn = expandpath(monomers_fn)
-        sequences_fn = expandpath(sequences_fn)
-
         logger.info('Reading SD Report')
         logger.info(f'    sd_report_fn = {sd_report_fn}')
         logger.info(f'    monomers_fn  = {monomers_fn}')
