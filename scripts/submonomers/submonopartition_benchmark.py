@@ -10,12 +10,14 @@ import sys
 
 from joblib import Parallel, delayed
 import numpy as np
+import networkx as nx
 
 import matplotlib.pyplot as plt
 
 this_dirname = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
+from debruijn_graph import iterative_graph, graph3col
 from sd_parser.sd_parser import SD_Report
 from standard_logger import get_logger
 from submonomers.submonomer_db import SubmonomerDB
@@ -204,7 +206,7 @@ def run_rate_stats(mappings, submonoassembly, submonoread_set,
     plt.hist(cor_submonoequiv_rate_subm.values(), bins=100, alpha=0.7)
     plt.yscale('log')
     plt.title('Histogram of Submonoequivocal Rate per monomer')
-    plt.xlabel('Error rate')
+    plt.xlabel('Submonoequivocal rate')
     plt.ylabel('Count (log)')
     plt.legend(['Before correction', 'After correction'])
     plt.savefig(os.path.join(outdir, 'submonoequiv_rate_per_submonomer.pdf'),
@@ -225,6 +227,7 @@ def run_rate_stats(mappings, submonoassembly, submonoread_set,
                                                   coverage_asm > 5))
     logger.info(f'Positions of high cor submonoequiv rate {high_cor_equiv_rate}')
     logger.info(f'Error rate            [50, 55, 60, 90, 95]%: {np.percentile(error_rate_asm, [50, 55, 60, 90, 95])}')
+    logger.info(f'Cor error rate        [50, 55, 60, 90, 95]%: {np.percentile(cor_error_rate_asm, [50, 55, 60, 90, 95])}')
     logger.info(f'Submonoequiv rate     [50, 55, 60, 90, 95]%: {np.percentile(submonoequiv_rate_asm, [50, 55, 60, 90, 95])}')
     logger.info(f'Cor submonoequiv rate [50, 55, 60, 90, 95]%: {np.percentile(cor_submonoequiv_rate_asm, [50, 55, 60, 90, 95])}')
 
@@ -270,6 +273,27 @@ def iscorrectsubmonomerclosest(mappings,
     logger.info(f'valid correction / attempt correction {valid_correct / attempted_correct}')
 
 
+def three_col_graph_stats(submonoassembly, cor_submonoread_set, outdir,
+                          mink=15, maxk=20, def_min_mult=2):
+    # TODO refactor after the graph refactoring is complete
+    _, dbs_assembly, uncompr_dbs_assembly, _, _ = \
+        iterative_graph({'assembly': submonoassembly},
+                        min_k=maxk, max_k=maxk,
+                        outdir=os.path.join(outdir, 'assembly_graph'),
+                        def_min_mult=1)
+
+    _, dbs, uncompr_dbs, _, _ = \
+        iterative_graph(cor_submonoread_set.cor_submonostrings,
+                        min_k=mink, max_k=maxk,
+                        outdir=os.path.join(outdir, 'cor_read_graph'),
+                        def_min_mult=def_min_mult)
+    gr3col = graph3col(uncompr_dbs_assembly[maxk], uncompr_dbs[maxk])
+    gr3col_outdir = os.path.join(outdir, 'gr3col')
+    smart_makedirs(gr3col_outdir)
+    dot_file = os.path.join(gr3col_outdir, f'db_k{maxk}.dot')
+    nx.drawing.nx_pydot.write_dot(gr3col, dot_file)
+
+
 def main():
     params = parse_args()
     smart_makedirs(params.outdir)
@@ -291,6 +315,10 @@ def main():
                                cor_submonoread_set=cor_submonoread_set,
                                submonoassembly=submonoassembly,
                                logger=logger)
+
+    logger.info('Building graphs')
+    three_col_graph_stats(submonoassembly, cor_submonoread_set, params.outdir,
+                          mink=15, maxk=20, def_min_mult=2)
 
 
 if __name__ == "__main__":

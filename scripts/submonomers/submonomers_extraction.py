@@ -56,7 +56,7 @@ def _reduce2shortest(reduced2overlaps):
 
 
 def _submonomer_seqs_for_monomer_extraction(nucl_segms, coverage,
-                                            coverage_coef=0.2):
+                                            coverage_coef=0.25):
     cnt_segments = Counter(nucl_segms)
     freq_segments = set(seq for seq, cnt in cnt_segments.items()
                         if cnt >= coverage*coverage_coef)
