@@ -16,6 +16,7 @@ from sd_parser.sd_parser import SD_Report
 from standard_logger import get_logger
 from submonomers.submonomer_db import SubmonomerDB
 from utils.bio import perfect_overlap
+from utils.git import get_git_revision_short_hash
 from utils.os_utils import smart_makedirs, expandpath
 
 
@@ -122,6 +123,10 @@ def main():
     logger = \
         get_logger(logfile,
                    logger_name="centroFlye: submonomers_extraction_benchmark")
+
+    logger.info(f'cmd: {sys.argv}')
+    logger.info(f'git hash: {get_git_revision_short_hash()}')
+
     logger.info('Reading SD reports')
     sd_report_reads = SD_Report(sd_report_fn=params.sd_report_reads,
                                 sequences_fn=params.reads,

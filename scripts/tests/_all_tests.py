@@ -15,6 +15,7 @@ sys.path.append(os.path.join(this_dirname, os.path.pardir))
 from monomers_tests import MonomersTests
 from sd_parser_tests import SDParserTests, SDParserWOHPCTests
 from standard_logger import get_logger
+from utils.git import get_git_revision_short_hash
 
 
 def main():
@@ -23,6 +24,9 @@ def main():
                         level=logging.DEBUG,
                         filemode='w',
                         stdout=False)
+    logger.info(f'cmd: {sys.argv}')
+    logger.info(f'git hash: {get_git_revision_short_hash()}')
+
     unittest.main()
 
 

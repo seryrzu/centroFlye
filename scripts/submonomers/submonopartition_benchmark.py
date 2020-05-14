@@ -25,6 +25,7 @@ from submonomers.submonostring import SubmonoString
 from submonomers.submonomers_extraction_benchmark import get_coverage
 from submonomers.submonostring_set import SubmonoStringSet,\
                                           CorrectedSubmonoStringSet
+from utils.git import get_git_revision_short_hash
 from utils.os_utils import smart_makedirs, expandpath
 
 
@@ -307,6 +308,10 @@ def main():
     logger = \
         get_logger(logfile,
                    logger_name="centroFlye: submonopartition_benchmark")
+
+    logger.info(f'cmd: {sys.argv}')
+    logger.info(f'git hash: {get_git_revision_short_hash()}')
+
     submonoread_set, submonoassembly = get_submonostrings(params, logger)
     submonomer_db_fn = os.path.join(params.outdir,
                                     'submonomer_db.fasta')

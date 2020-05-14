@@ -13,6 +13,7 @@ from sd_parser.sd_parser import SD_Report
 from standard_logger import get_logger
 from submonomers.submonomer_db import SubmonomerDB
 from submonomers.submonostring_set import SubmonoStringSet
+from utils.git import get_git_revision_short_hash
 from utils.os_utils import smart_makedirs, expandpath
 
 
@@ -37,6 +38,9 @@ def main():
     logfile = os.path.join(params.outdir, 'partitioning.log')
     logger = get_logger(logfile,
                         logger_name="centroFlye: submonopartion")
+
+    logger.info(f'cmd: {sys.argv}')
+    logger.info(f'git hash: {get_git_revision_short_hash()}')
 
     logger.info('Reading SD Report')
     logger.info(f'    sd_report_fn = {params.sd_report}')
