@@ -25,7 +25,7 @@ from submonomers.submonostring import SubmonoString
 from submonomers.submonomers_extraction_benchmark import get_coverage
 from submonomers.submonostring_set import SubmonoStringSet,\
                                           CorrectedSubmonoStringSet
-from utils.os_utils import smart_makedirs
+from utils.os_utils import smart_makedirs, expandpath
 
 
 def parse_args():
@@ -37,6 +37,12 @@ def parse_args():
     parser.add_argument("--assembly", required=True)
     parser.add_argument("--outdir", required=True)
     params = parser.parse_args()
+    params.sd_report_reads = expandpath(params.sd_report_reads)
+    params.sd_report_assembly = expandpath(params.sd_report_assembly)
+    params.monomers = expandpath(params.monomers)
+    params.reads = expandpath(params.reads)
+    params.assembly = expandpath(params.assembly)
+    params.outdir = expandpath(params.outdir)
     return params
 
 
@@ -302,9 +308,28 @@ def main():
         get_logger(logfile,
                    logger_name="centroFlye: submonopartition_benchmark")
     submonoread_set, submonoassembly = get_submonostrings(params, logger)
+    submonomer_db_fn = os.path.join(params.outdir,
+                                    'submonomer_db.fasta')
+    logger.info(f'Exporting submonomer_db to {submonomer_db_fn}')
+    submonoread_set.submonomer_db.to_fasta(submonomer_db_fn)
+
+    submonoassembly_fn = os.path.join(params.outdir, 'submonoassembly.tsv')
+    logger.info(f'Exporting submonoassembly to {submonoassembly_fn}')
+    submonoassembly.to_tsv(submonoassembly_fn)
+
+    submonoread_set_fn = os.path.join(params.outdir, 'submonoread_set.tsv')
+    logger.info(f'Exporting submonoreads to {submonoread_set_fn}')
+    submonoread_set.to_tsv(submonoread_set_fn)
+
     logger.info(f'Correcting submonostring set')
     cor_submonoread_set = \
         CorrectedSubmonoStringSet.from_submonostring_set(submonoread_set)
+
+    cor_submonoread_set_fn = os.path.join(params.outdir,
+                                          'cor_submonoread_set.tsv')
+    logger.info(f'Exporting corrected submonoreads to {cor_submonoread_set_fn}')
+    cor_submonoread_set.to_tsv(cor_submonoread_set_fn)
+
     logger.info(f'Mapping reads')
     mappings = map_reads(submonoread_set, submonoassembly)
     run_rate_stats(mappings, submonoassembly, submonoread_set,

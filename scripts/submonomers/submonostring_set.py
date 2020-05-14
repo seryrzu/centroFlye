@@ -58,7 +58,7 @@ class SubmonoStringSet:
                           'nucl_segment']
                 print(sep.join(header), file=f)
 
-        for submonostring in self.submonostrings:
+        for submonostring in self.submonostrings.values():
             submonostring.to_tsv(filename=filename,
                                  mode='a',
                                  sep=sep,
@@ -91,3 +91,20 @@ class CorrectedSubmonoStringSet:
 
     def __getitem__(self, sub):
         return self.cor_submonostrings[sub]
+
+    def to_tsv(self, filename, sep='\t', print_header=True):
+        # TODO remove this repetitive code. Compare to SubmonoStringSet
+        with open(filename, mode='w') as f:
+            if print_header:
+                header = ['seq_id', 'is_seq_reversed', 'submonochar',
+                          'st', 'en', 'monoindex', 'monomer_id',
+                          'mono_strand', 'mono_reliability',
+                          'submono_is_identified', 'submono_is_unequivocal',
+                          'nucl_segment']
+                print(sep.join(header), file=f)
+
+        for cor_submonostring in self.cor_submonostrings.values():
+            cor_submonostring.to_tsv(filename=filename,
+                                     mode='a',
+                                     sep=sep,
+                                     print_header=False)
