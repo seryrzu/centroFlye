@@ -269,20 +269,26 @@ class DeBruijnGraph:
                         assert string_kmer == kmer
                 cumm_len += len(split_string) + 1
 
-            path = [x[0][0] for x in read_coords]
-            path = [x[0] for x in groupby(path)]
-            path = [db_edges[edge_ind] for edge_ind in path]
+            if len(read_coords) == 0:
+                mapping[r_id] = None
+                continue
+
+            (edge_ind, edge_coord), _ = read_coords[0]
+            edge_path = [edge_ind]
+            for (cur_edge_ind, cur_edge_coord), _ in read_coords[1:]:
+                if edge_ind != cur_edge_ind or cur_edge_coord <= edge_coord:
+                    edge_path.append(cur_edge_ind)
+                edge_ind = cur_edge_ind
+                edge_coord = cur_edge_coord
+            path = [db_edges[edge_ind] for edge_ind in edge_path]
 
             valid_path = True
             for e1, e2 in zip(path[:-1], path[1:]):
                 if e1[1] != e2[0]:
                     valid_path = False
                     break
-            if len(read_coords):
-                mapping[r_id] = (read_coords[0], read_coords[-1],
-                                 valid_path, path)
-            else:
-                mapping[r_id] = None
+            mapping[r_id] = (read_coords[0], read_coords[-1],
+                                valid_path, path)
         return mapping
 
     def get_long_edges(self):
