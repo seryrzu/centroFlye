@@ -9,6 +9,7 @@ import os
 import networkx as nx
 
 from sequence_graph.db_graph import DeBruijnGraph
+from utils.kmers import get_kmer_index
 from utils.os_utils import smart_makedirs
 
 logger = logging.getLogger("centroFlye.sequence_graph.idb_graph")
@@ -18,20 +19,27 @@ def def_get_min_mult(k, mode):
     if mode == 'assembly':
         return 1
     if mode == 'hifi':
-        return 3
+        if k <= 25:
+            return 3
+        else:
+            # path graph construction
+            return 1
     assert mode == 'ont'
     if k < 100:
         return 25
-    elif 100 <= k < 150:
+    elif 100 <= k <= 150:
         return 20
-    elif 150 <= k < 200:
+    elif 150 < k <= 200:
         return 15
-    elif 200 <= k < 250:
+    elif 200 < k <= 250:
         return 10
-    elif 250 <= k < 300:
+    elif 250 < k <= 300:
         return 5
-    elif 300 <= k:
+    elif 300 < k <= 400:
         return 3
+    elif 400 < k:
+        # path graph construction
+        return 1
 
 
 def def_get_frequent_kmers(kmer_index, min_mult):
@@ -46,6 +54,7 @@ def get_idb(string_set,
             get_min_mult=None,
             get_frequent_kmers=None,
             all_kmer_index=None,
+            ignored_chars=None,
             step=1):
 
     assert mode in ['ont', 'hifi', 'assembly']
@@ -55,7 +64,9 @@ def get_idb(string_set,
         get_frequent_kmers = def_get_frequent_kmers
 
     if all_kmer_index is None:
-        all_kmer_index = string_set.get_kmer_index(mink=mink, maxk=maxk)
+        all_kmer_index = get_kmer_index(seqs=string_set.values(),
+                                        mink=mink, maxk=maxk,
+                                        ignored_chars=ignored_chars)
     else:
         assert all(k in all_kmer_index.keys()
                    for k in range(mink, maxk+1, step))
@@ -118,3 +129,25 @@ def get_idb(string_set,
             complex_kp1mers = \
                 db.get_paths_thru_complex_nodes(all_kmer_index[k+1])
     return dbs, all_frequent_kmers
+
+
+def get_idb_monostring_set(string_set,
+                           mink, maxk,
+                           outdir,
+                           mode='ont',
+                           get_min_mult=None,
+                           get_frequent_kmers=None,
+                           all_kmer_index=None,
+                           step=1):
+    # TODO: check that works for submonostring_set
+    if all_kmer_index is None:
+        all_kmer_index = string_set.get_kmer_index(mink=mink, maxk=maxk)
+
+    return get_idb(string_set=string_set,
+                   mink=mink, maxk=maxk,
+                   outdir=outdir,
+                   mode=mode,
+                   get_min_mult=get_min_mult,
+                   get_frequent_kmers=get_frequent_kmers,
+                   all_kmer_index=all_kmer_index,
+                   step=step)
