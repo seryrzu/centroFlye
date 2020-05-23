@@ -223,16 +223,9 @@ class MonoString:
         return self.nucl_sequence[st:en]
 
     def get_kmer_index(self, mink, maxk):
-        assert 0 < mink <= maxk
-        kmerindex = {}
-        for k in range(mink, maxk+1):
-            kmerindex[k] = Counter()
-            for i in range(len(self.raw_monostring)-k+1):
-                kmer = self.raw_monostring[i:i+k]
-                if self.gap_symb not in kmer:
-                    kmer = tuple(kmer)
-                    kmerindex[k][kmer] += 1
-        return kmerindex
+        return get_kmer_index_seq(seq=self.raw_monostring,
+                                  mink=mink, maxk=maxk,
+                                  ignored_chars=set([self.gap_symb]))
 
 
 def assert_monostring_validity(monostring):

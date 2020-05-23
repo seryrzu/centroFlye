@@ -8,7 +8,9 @@ import logging
 import numpy as np
 
 from monomers.monostring import MonoString
+from utils.kmers import get_kmer_index
 from utils.bio import compress_homopolymer
+from utils.various import fst_iterable
 
 logger = logging.getLogger("centroFlye.monomers.monostring_set")
 
@@ -119,18 +121,8 @@ class MonoStringSet:
             return stats
 
     def get_kmer_index(self, mink, maxk):
-        logger.info(f'Extracting kmer index mink={mink}, maxk={maxk}')
-        assert 0 < mink <= maxk
-        kmer_index = {}
-        for k in range(mink, maxk+1):
-            kmer_index[k] = Counter()
-        nmonostrings = len(self.monostrings)
-        for i, monostring in enumerate(self.monostrings.values()):
-            logger.debug(f'{i+1} / {nmonostrings}, {monostring.seq_id}')
-            ms_index = monostring.get_kmer_index(mink=mink,
-                                                 maxk=maxk)
-            for k in range(mink, maxk+1):
-                for kmer, cnt in ms_index[k].items():
-                    kmer_index[k][kmer] += cnt
-        logger.info(f'Finished extracting kmer index')
-        return kmer_index
+        assert len(self.monostrings) > 0
+        gap_symb = fst_iterable(self.monostrings.values()).gap_symb
+        return get_kmer_index(seqs=self.monostrings.values(),
+                              mink=mink, maxk=maxk,
+                              ignored_chars=set([gap_symb]))

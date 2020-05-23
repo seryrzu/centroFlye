@@ -10,6 +10,7 @@ from copy import deepcopy
 import edlib
 
 from monomers.monostring import MonoInstance, MonoString
+from utils.kmers import get_kmer_index_seq
 from utils.various import list2str
 
 logger = logging.getLogger("centroFlye.submonomers.submonostring")
@@ -195,16 +196,9 @@ class SubmonoString(MonoString):
         return {self.gap_symb, self.submonogap_symb, self.submonoequiv_symb}
 
     def get_kmer_index(self, mink, maxk):
-        assert 0 < mink <= maxk
-        kmerindex = {}
-        for k in range(mink, maxk+1):
-            kmerindex[k] = Counter()
-            for i in range(len(self.raw_submonostring)-k+1):
-                kmer = self.raw_submonostring[i:i+k]
-                if len(set(kmer) & self.get_gap_symbols()) == 0:
-                    kmer = tuple(kmer)
-                    kmerindex[k][kmer] += 1
-        return kmerindex
+        return get_kmer_index_seq(seq=self.raw_submonostring,
+                                  mink=mink, maxk=maxk,
+                                  ignored_chars=self.get_gap_symbols())
 
     def __getitem__(self, sub):
         if isinstance(sub, slice):
