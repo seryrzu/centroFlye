@@ -158,7 +158,9 @@ class DeBruijnGraph:
 
     def get_contigs(self):
         def get_longest_valid_outpaths(graph):
-            def get_valid_outpath_edge(edge, taken_edges=set()):
+            def get_valid_outpath_edge(edge, taken_edges=None):
+                if taken_edges is None:
+                    taken_edges = set()
                 path = [edge]
                 out_node = edge[1]
                 out_degree_out_node = graph.out_degree(out_node)
