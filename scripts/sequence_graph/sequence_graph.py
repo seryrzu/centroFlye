@@ -5,6 +5,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 import logging
+from subprocess import check_call
 
 import networkx as nx
 
@@ -22,7 +23,8 @@ class SequenceGraph(ABC):
     def __init__(self,
                  nx_graph=None,
                  nodeindex2label=None,
-                 nodelabel2index=None):
+                 nodelabel2index=None,
+                 collapse=True):
         all_None = all((nx_graph is None,
                         nodeindex2label is None,
                         nodelabel2index is None))
@@ -42,6 +44,8 @@ class SequenceGraph(ABC):
             self._assert_nx_graph_validity()
 
         self.db_index = None
+        if collapse:
+            self.collapse_nonbranching_paths()
 
     @classmethod
     @abstractmethod
@@ -283,3 +287,20 @@ class SequenceGraph(ABC):
             mappings[s_id] = Mapping(str_coords[0], str_coords[-1],
                                      valid_path, path)
         return mappings
+
+    def write_dot(self, outfile, compact=False, export_pdf=True):
+        if outfile[-3:] == 'dot':
+            outfile = outfile[:-4]
+        if not compact:
+            graph = self.nx_graph
+        else:
+            graph = nx.MultiDiGraph()
+            for s, e, key, data in self.nx_graph.edges(keys=True, data=True):
+                graph.add_edge(s, e, key,
+                               color=data[self.color],
+                               label=data[self.label])
+        dotfile = f'{outfile}.dot'
+        nx.drawing.nx_pydot.write_dot(graph, dotfile)
+        if export_pdf:
+            pdffile = f'{outfile}.pdf'
+            check_call(['dot','-Tpdf', dotfile,'-o', pdffile])

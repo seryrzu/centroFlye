@@ -15,10 +15,12 @@ logger = logging.getLogger("centroFlye.sequence_graph.db_graph")
 class DeBruijnGraph(SequenceGraph):
     coverage = 'coverage'
 
-    def __init__(self, nx_graph, nodeindex2label, nodelabel2index, k):
+    def __init__(self, nx_graph, nodeindex2label, nodelabel2index, k,
+                 collapse=True):
         super().__init__(nx_graph=nx_graph,
                          nodeindex2label=nodeindex2label,
-                         nodelabel2index=nodelabel2index)
+                         nodelabel2index=nodelabel2index,
+                         collapse=collapse)
         self.k = k  # length of an edge in the uncompressed graph
 
     @classmethod
@@ -27,11 +29,11 @@ class DeBruijnGraph(SequenceGraph):
         length = par_dict[cls.length]
 
         mean_cov = np.mean(cov)
-        label = f'len={length}\ncov={mean_cov:0.2}'
+        label = f'len={length}\ncov={mean_cov:0.2f}'
         return label
 
     @classmethod
-    def from_kmers(cls, kmers, kmer_coverages=None):
+    def from_kmers(cls, kmers, kmer_coverages=None, collapse=True):
         def add_kmer(kmer, coverage=1, default_color='black'):
             prefix, suffix = kmer[:-1], kmer[1:]
 
@@ -76,7 +78,8 @@ class DeBruijnGraph(SequenceGraph):
         db_graph = cls(nx_graph=nx_graph,
                        nodeindex2label=nodeindex2label,
                        nodelabel2index=nodelabel2index,
-                       k=k)
+                       k=k,
+                       collapse=collapse)
         return db_graph
 
     def _add_edge(self, node, color, string,
@@ -95,3 +98,34 @@ class DeBruijnGraph(SequenceGraph):
                                label=label,
                                length=edge_len,
                                color=color)
+
+    def get_complex_nodes(self):
+        complex_nodes = []
+        for node in self.nx_graph.nodes():
+            indegree = self.nx_graph.in_degree(node)
+            outdegree = self.nx_graph.out_degree(node)
+            if indegree > 1 and outdegree > 1:
+                complex_nodes.append(node)
+        return complex_nodes
+
+    def get_paths_thru_complex_nodes(self, kmer_index, min_mult=2):
+        complex_nodes = self.get_complex_nodes()
+        k = self.k
+
+        selected_kp1mers = {}
+        for node in complex_nodes:
+            for in_edge in self.nx_graph.in_edges(node,
+                                                  keys=True, data=True):
+                for out_edge in self.nx_graph.out_edges(node,
+                                                        keys=True, data=True):
+                    in_kmer = in_edge[3][self.string][-k:]
+                    out_kmer = out_edge[3][self.string][:k]
+
+                    assert in_kmer[1:] == \
+                        out_kmer[:-1] == \
+                        self.nodeindex2label[node]
+
+                    kp1 = in_kmer + (out_kmer[-1],)
+                    if kmer_index[kp1] >= min_mult:
+                        selected_kp1mers[kp1] = kmer_index[kp1]
+        return selected_kp1mers
