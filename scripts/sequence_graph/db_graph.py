@@ -34,7 +34,7 @@ class DeBruijnGraph(SequenceGraph):
 
     @classmethod
     def from_kmers(cls, kmers, kmer_coverages=None, collapse=True):
-        def add_kmer(kmer, coverage=1, default_color='black'):
+        def add_kmer(kmer, coverage=1, color='black'):
             prefix, suffix = kmer[:-1], kmer[1:]
 
             if prefix in nodelabel2index:
@@ -60,7 +60,7 @@ class DeBruijnGraph(SequenceGraph):
                               length=length,
                               coverage=coverage,
                               label=label,
-                              color=default_color)
+                              color=color)
 
         nx_graph = nx.MultiDiGraph()
         nodeindex2label = {}
@@ -129,3 +129,15 @@ class DeBruijnGraph(SequenceGraph):
                     if kmer_index[kp1] >= min_mult:
                         selected_kp1mers[kp1] = kmer_index[kp1]
         return selected_kp1mers
+
+    def get_all_kmers(self):
+        kmers = {}
+        for s, e, key, data in self.nx_graph.edges(keys=True, data=True):
+            coverage = data[self.coverage]
+            string = data[self.string]
+            assert len(coverage) == len(string)-self.k+1
+            for i in range(len(string)-self.k+1):
+                kmer = string[i:i+self.k]
+                kmer = tuple(kmer)
+                kmers[kmer] = coverage[i]
+        return kmers

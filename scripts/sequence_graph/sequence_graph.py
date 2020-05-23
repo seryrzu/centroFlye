@@ -81,7 +81,7 @@ class SequenceGraph(ABC):
             out_edge_color = self.nx_graph.get_edge_data(*out_edge)[self.color]
 
             # if in_edge == out_edge this is a loop and should not be removed
-            return in_edge != out_edge and in_edge_color and out_edge_color
+            return in_edge != out_edge and in_edge_color == out_edge_color
 
         nodes = list(self.nx_graph)
         for node in nodes:
