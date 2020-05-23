@@ -194,7 +194,7 @@ class SubmonoString(MonoString):
     def get_gap_symbols(self):
         return {self.gap_symb, self.submonogap_symb, self.submonoequiv_symb}
 
-    def get_submonokmer_index(self, mink, maxk):
+    def get_kmer_index(self, mink, maxk):
         assert 0 < mink <= maxk
         kmerindex = {}
         for k in range(mink, maxk+1):

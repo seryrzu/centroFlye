@@ -75,7 +75,8 @@ class MonoStringSet:
                 all_monomerinstances_dict[monoindex] += mi_dict[monoindex]
         return all_monomerinstances_dict
 
-    def get_monomerinstances_by_monoindex(self, mono_index, only_reliable=True):
+    def get_monomerinstances_by_monoindex(self, mono_index,
+                                          only_reliable=True):
         all_monomerinstances_dict = \
             self.classify_monomerinstances(only_reliable=only_reliable)
         return all_monomerinstances_dict[mono_index]
@@ -116,3 +117,16 @@ class MonoStringSet:
         logger.info(f'#Gap runs = {stats["ngap_runs"]}')
         if return_stats:
             return stats
+
+    def get_kmer_index(self, mink, maxk):
+        assert 0 < mink <= maxk
+        kmer_index = {}
+        for k in range(mink, maxk+1):
+            kmer_index[k] = Counter()
+        for monostring in self.monostrings.values():
+            ms_index = monostring.get_kmer_index(mink=mink,
+                                                 maxk=maxk)
+            for k in range(mink, maxk+1):
+                for kmer, cnt in ms_index[k].items():
+                    kmer_index[k][kmer] += cnt
+        return kmer_index

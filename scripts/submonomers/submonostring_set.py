@@ -32,14 +32,14 @@ class SubmonoStringSet:
                                 submonomer_db=submonomer_db)
         return submonostring_set
 
-    def get_submonokmer_index(self, mink, maxk):
+    def get_kmer_index(self, mink, maxk):
         assert 0 < mink <= maxk
         kmer_index = {}
         for k in range(mink, maxk+1):
             kmer_index[k] = Counter()
         for submonostring in self.submonostrings.values():
-            sms_index = submonostring.get_submonokmer_index(mink=mink,
-                                                            maxk=maxk)
+            sms_index = submonostring.get_kmer_index(mink=mink,
+                                                     maxk=maxk)
             for k in range(mink, maxk+1):
                 for kmer, cnt in sms_index[k].items():
                     kmer_index[k][kmer] += cnt
@@ -73,8 +73,8 @@ class CorrectedSubmonoStringSet:
     @classmethod
     def from_submonostring_set(cls, submonostring_set, mink=3, maxk=50):
         logger.info(f'Constructing kmer index for mink={mink}, maxk={maxk}')
-        kmer_index = submonostring_set.get_submonokmer_index(mink=mink,
-                                                             maxk=maxk)
+        kmer_index = submonostring_set.get_kmer_index(mink=mink,
+                                                      maxk=maxk)
         logger.info('Finished constructing kmer index')
         logger.info('Correcting submonostrings')
         cor_submonostrings = {}

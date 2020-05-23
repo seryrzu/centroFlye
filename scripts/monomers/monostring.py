@@ -2,6 +2,7 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+from collections import Counter
 from enum import Enum
 from itertools import count
 import logging
@@ -162,7 +163,7 @@ class MonoString:
             reverse_if_needed(monoinstances, nucl_sequence)
         string = get_string(monoinstances)
 
-        logger.debug(f'Finished constructing raw_monostring for sequence {seq_id}')
+        logger.debug(f'Finished constraction raw_monostring for seq {seq_id}')
         logger.debug(f'    length of string = {len(string)}')
         logger.debug(f'    string: {string}')
 
@@ -221,6 +222,18 @@ class MonoString:
         assert 0 <= st < en < len(self.nucl_sequence)
         return self.nucl_sequence[st:en]
 
+    def get_kmer_index(self, mink, maxk):
+        assert 0 < mink <= maxk
+        kmerindex = {}
+        for k in range(mink, maxk+1):
+            kmerindex[k] = Counter()
+            for i in range(len(self.raw_monostring)-k+1):
+                kmer = self.raw_monostring[i:i+k]
+                if self.gap_symb not in kmer:
+                    kmer = tuple(kmer)
+                    kmerindex[k][kmer] += 1
+        return kmerindex
+
 
 def assert_monostring_validity(monostring):
     string = monostring.raw_monostring
@@ -236,6 +249,4 @@ def assert_monostring_validity(monostring):
 
     nucl_sequence = monostring.nucl_sequence
     for mi in monoinsts:
-        if nucl_sequence[mi.st:mi.en] != mi.nucl_segment:
-            print(mi.st, mi.en)
         assert nucl_sequence[mi.st:mi.en] == mi.nucl_segment
