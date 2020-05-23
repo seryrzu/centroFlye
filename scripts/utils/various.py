@@ -97,3 +97,6 @@ def weighted_random_by_dct(dct):
         if rand_val <= total:
             return k
     assert False, 'unreachable'
+
+def fst_iterable(iterable):
+    return next(iter(iterable))

@@ -14,6 +14,7 @@ sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
 from monomers_tests import MonomersTests
 from sd_parser_tests import SDParserTests, SDParserWOHPCTests
+from graph_tests import DBGraphTests
 from standard_logger import get_logger
 from utils.git import get_git_revision_short_hash
 
@@ -31,4 +32,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+   main()
