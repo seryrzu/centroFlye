@@ -15,6 +15,10 @@ logger = logging.getLogger("centroFlye.sequence_graph.db_graph_3col")
 class DeBruijnGraph3Color(SequenceGraph):
     read_coverage = 'read_coverage'
     assembly_coverage = 'assembly_coverage'
+    col_assembly = 'blue'
+    col_reads = 'red'
+    col_both = 'green'
+
 
     def __init__(self, nx_graph, nodeindex2label, nodelabel2index, k,
                  collapse=True):
@@ -95,15 +99,15 @@ class DeBruijnGraph3Color(SequenceGraph):
         for kmer in kmers_both:
             add_kmer(kmer, read_coverage=kmers_reads_cov[kmer],
                      assembly_coverage=kmers_assembly_cov[kmer],
-                     color='green')
+                     color=cls.col_both)
         for kmer in kmers_reads:
             add_kmer(kmer, read_coverage=kmers_reads_cov[kmer],
                      assembly_coverage=None,
-                     color='red')
+                     color=cls.col_reads)
         for kmer in kmers_assembly:
             add_kmer(kmer, read_coverage=None,
                      assembly_coverage=kmers_assembly_cov[kmer],
-                     color='blue')
+                     color=cls.col_assembly)
 
         k = gr_assembly.k
         assert k == gr_reads.k
@@ -151,3 +155,29 @@ class DeBruijnGraph3Color(SequenceGraph):
                                assembly_coverage=assembly_cov,
                                label=label,
                                color=color)
+
+
+    def get_kmers_on_edges(self, color=None):
+        kmer2edge = {}
+        edge2kmer = {}
+        for s, e, key, data in self.nx_graph.edges(keys=True, data=True):
+            if color is not None and data[self.color] != color:
+                continue
+
+            edge = (s, e, key)
+            edge2kmer[edge] = []
+            string = data[self.string]
+            for i in range(len(string)-self.k+1):
+                kmer = string[i:i+self.k]
+                kmer2edge[kmer] = (edge, i)
+                edge2kmer[edge].append(kmer)
+        return kmer2edge, edge2kmer
+
+    def get_kmers_on_assembly_edges(self):
+        return self.get_kmers_on_edges(color=self.col_assembly)
+
+    def get_kmers_on_read_edges(self):
+        return self.get_kmers_on_edges(color=self.col_reads)
+
+    def get_kmers_on_assembly_read_edges(self):
+        return self.get_kmers_on_edges(color=self.col_both)
