@@ -33,16 +33,20 @@ class SubmonoStringSet:
         return submonostring_set
 
     def get_kmer_index(self, mink, maxk):
+        logger.info(f'Extracting kmer index mink={mink}, maxk={maxk}')
         assert 0 < mink <= maxk
         kmer_index = {}
         for k in range(mink, maxk+1):
             kmer_index[k] = Counter()
+        nsubmonostrings = len(self.monostrings)
         for submonostring in self.submonostrings.values():
+            logger.debug(f'{i+1} / {nsubmonostrings}, {submonostring.seq_id}')
             sms_index = submonostring.get_kmer_index(mink=mink,
                                                      maxk=maxk)
             for k in range(mink, maxk+1):
                 for kmer, cnt in sms_index[k].items():
                     kmer_index[k][kmer] += cnt
+        logger.info(f'Finished extracting kmer index')
         return kmer_index
 
     def __getitem__(self, sub):
