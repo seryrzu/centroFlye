@@ -66,6 +66,9 @@ class MonoStringSet:
             assert seq_id in self.monostrings_filt_out
             return self.monostrings_filt_out[seq_id].nucl_sequence
 
+    def __getitem__(self, sub):
+        return self.monostrings[sub]
+
     def classify_monomerinstances(self, only_reliable=True):
         monoindexes = self.monomer_db.get_monoindexes()
         all_monomerinstances_dict = \
