@@ -40,3 +40,10 @@ def get_kmer_index(seqs, mink, maxk, ignored_chars=None):
                 kmer_index[k][kmer] += cnt
     logger.info(f'Finished extracting kmer index')
     return kmer_index
+
+
+def get_kmer_freqs_in_index(kmer_index, kmer_list):
+    frequences = []
+    for kmer in kmer_list:
+        frequences.append(kmer_index[kmer])
+    return frequences

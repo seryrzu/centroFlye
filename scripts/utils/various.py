@@ -100,3 +100,14 @@ def weighted_random_by_dct(dct):
 
 def fst_iterable(iterable):
     return next(iter(iterable))
+
+
+def index(lst, sublst):
+    # search sublst locations in lst (exact match)
+    lst = tuple(lst)
+    sublst = tuple(sublst)
+    locations = []
+    for i in range(len(lst)-len(sublst)+1):
+        if lst[i:i+len(sublst)] == sublst:
+            locations.append((i, i+len(sublst)))
+    return locations
