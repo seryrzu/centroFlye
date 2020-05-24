@@ -163,7 +163,7 @@ class MonoString:
             reverse_if_needed(monoinstances, nucl_sequence)
         string = get_string(monoinstances)
 
-        logger.debug(f'Finished constraction raw_monostring for seq {seq_id}')
+        logger.debug(f'Finished construction raw_monostring for seq {seq_id}')
         logger.debug(f'    length of string = {len(string)}')
         logger.debug(f'    string: {string}')
 
