@@ -129,3 +129,12 @@ class MonoStringSet:
         return get_kmer_index(seqs=self.monostrings.values(),
                               mink=mink, maxk=maxk,
                               ignored_chars=set([gap_symb]))
+
+    def keys(self):
+        return self.monostrings.keys()
+
+    def values(self):
+        return self.monostrings.values()
+
+    def items(self):
+        return self.monostrings.items()
