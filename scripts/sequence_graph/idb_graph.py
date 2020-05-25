@@ -11,6 +11,7 @@ import networkx as nx
 from sequence_graph.db_graph import DeBruijnGraph
 from utils.kmers import get_kmer_index
 from utils.os_utils import smart_makedirs
+from utils.various import fst_iterable
 
 logger = logging.getLogger("centroFlye.sequence_graph.idb_graph")
 
@@ -26,25 +27,50 @@ def def_get_min_mult(k, mode):
             return 1
     assert mode == 'ont'
     if k < 100:
-        return 25
-    elif 100 <= k <= 150:
+        # not tested for k < 100
         return 20
-    elif 150 < k <= 200:
+    elif 100 <= k <= 400:
         return 15
-    elif 200 < k <= 250:
-        return 10
-    elif 250 < k <= 300:
-        return 5
-    elif 300 < k <= 400:
-        return 3
     elif 400 < k:
         # path graph construction
         return 1
 
 
-def def_get_frequent_kmers(kmer_index, min_mult):
-    return {kmer: cnt for kmer, cnt in kmer_index.items()
-            if cnt >= min_mult}
+def def_get_frequent_kmers(kmer_index, string_set,
+                           min_mult, min_mult_rescue=4):
+    min_mult_rescue = min(min_mult, min_mult_rescue)
+    if min_mult > 1:
+        assert min_mult_rescue > 1  # otherwise need to handle '?' symbs
+    assert len(kmer_index) > 0
+    k = len(fst_iterable(kmer_index.keys()))
+
+    frequent_kmers = {kmer: cnt for kmer, cnt in kmer_index.items()
+                      if cnt >= min_mult}
+
+    def get_first_reliable(kmers):
+        for i, kmer in enumerate(kmers):
+            kmer_mult = kmer_index[kmer]
+            if kmer_mult >= min_mult:
+                return i
+        return None
+
+    for s_id, string in string_set.items():
+        kmers = [tuple(string[i:i+k]) for i in range(len(string)-k+1)]
+        left = get_first_reliable(kmers)
+        if left is None:
+            continue
+        right = get_first_reliable(kmers[::-1])
+        assert right is not None
+        right = len(string) - right - 1
+        assert left <= right
+
+        for i in range(left, right+1):
+            kmer = string[i:i+k]
+            kmer = tuple(kmer)
+            kmer_mult = kmer_index[kmer]
+            if kmer_mult >= min_mult_rescue:
+                frequent_kmers[kmer] = kmer_mult
+    return frequent_kmers
 
 
 def get_idb(string_set,
@@ -81,6 +107,7 @@ def get_idb(string_set,
         min_mult = get_min_mult(k=k, mode=mode)
         kmer_index = all_kmer_index[k]
         frequent_kmers = get_frequent_kmers(kmer_index=kmer_index,
+                                            string_set=string_set,
                                             min_mult=min_mult)
         # extending frequent kmers with contig kmers
         for kmer, cnt in contig_kmers.items():
@@ -101,7 +128,8 @@ def get_idb(string_set,
         logger.info(f'min_mult = {min_mult}')
 
         db = DeBruijnGraph.from_kmers(kmers=frequent_kmers.keys(),
-                                      kmer_coverages=frequent_kmers)
+                                      kmer_coverages=frequent_kmers,
+                                      min_tip_cov=min_mult)
 
         ncc = nx.number_weakly_connected_components(db.nx_graph)
         logger.info(f'#cc = {ncc}')
@@ -113,7 +141,7 @@ def get_idb(string_set,
 
         dot_compact_file = os.path.join(outdir, f'db_k{k}_compact.dot')
         db.write_dot(outfile=dot_compact_file,
-                     export_pdf=k==maxk,
+                     export_pdf=(k == maxk),
                      compact=True)
 
         dbs[k] = db

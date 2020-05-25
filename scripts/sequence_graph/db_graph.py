@@ -33,7 +33,8 @@ class DeBruijnGraph(SequenceGraph):
         return label
 
     @classmethod
-    def from_kmers(cls, kmers, kmer_coverages=None, collapse=True):
+    def from_kmers(cls, kmers, kmer_coverages=None,
+                   min_tip_cov=1, collapse=True):
         def add_kmer(kmer, coverage=1, color='black'):
             prefix, suffix = kmer[:-1], kmer[1:]
 
@@ -62,6 +63,35 @@ class DeBruijnGraph(SequenceGraph):
                               label=label,
                               color=color)
 
+        def remove_lowcov_tips():
+            while True:
+                edges_to_remove = []
+                for s, e, key, data in nx_graph.edges(keys=True, data=True):
+                    edge = (s, e, key)
+                    cov = data[cls.coverage]
+                    # We save coverage as list due to subsequent collapsing
+                    # At this stage we did not collapse yet
+                    assert len(cov) == 1
+                    cov = cov[0]
+                    indegree = nx_graph.in_degree(s)
+                    outdegree = nx_graph.out_degree(e)
+                    is_tip = (indegree == 0) or (outdegree == 0)
+                    if is_tip and cov < min_tip_cov:
+                        edges_to_remove.append((edge, indegree, outdegree))
+
+                if len(edges_to_remove) == 0:
+                    break
+
+                for (s, e, key), indegree, outdegree in edges_to_remove:
+                    nx_graph.remove_edge(s, e, key)
+
+            isolates = list(nx.isolates(nx_graph))
+            nx_graph.remove_nodes_from(isolates)
+            for isolate in isolates:
+                label = nodeindex2label[isolate]
+                del nodeindex2label[isolate]
+                del nodelabel2index[label]
+
         nx_graph = nx.MultiDiGraph()
         nodeindex2label = {}
         nodelabel2index = {}
@@ -75,6 +105,9 @@ class DeBruijnGraph(SequenceGraph):
         assert len(kmers)
         k = len(kmers[0])
         assert all(len(kmer) == k for kmer in kmers)
+
+        remove_lowcov_tips()
+
         db_graph = cls(nx_graph=nx_graph,
                        nodeindex2label=nodeindex2label,
                        nodelabel2index=nodelabel2index,
