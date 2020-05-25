@@ -2,7 +2,6 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
-from collections import Counter
 from enum import Enum
 from itertools import count
 import logging
@@ -10,6 +9,7 @@ import logging
 import numpy as np
 
 from utils.bio import RC
+from utils.kmers import get_kmer_index_seq
 
 logger = logging.getLogger("centroFlye.monomers.monostring")
 
@@ -33,27 +33,39 @@ class Reliability(Enum):
 
 
 class MonoInstance:
-    def __init__(self, monomer, strand, seq_id, nucl_segment,
+    def __init__(self, monomer, sec_monomer, strand, sec_strand,
+                 seq_id, nucl_segment,
                  st, en, seq_len,
-                 reliability):
+                 reliability,
+                 identity, sec_identity):
         assert en - st == len(nucl_segment)
         self.monomer = monomer
+        self.sec_monomer = sec_monomer
         self.strand = strand
+        self.sec_strand = sec_strand
         self.seq_id = seq_id
         self.nucl_segment = nucl_segment
         self.st = st
         self.en = en
         self.seq_len = seq_len
         self.reliability = reliability
+        self.identity = identity
+        self.sec_identity = sec_identity
 
     def get_monoindex(self):
         return self.monomer.mono_index
+
+    def get_secmonoindex(self):
+        return self.sec_monomer.mono_index
 
     def get_ref_seq(self):
         return self.monomer.seq
 
     def get_monoid(self):
         return self.monomer.monomer_id
+
+    def get_secmonoid(self):
+        return self.sec_monomer.monomer_id
 
     def is_lowercase(self):
         return self.strand == Strand.REVERSE
@@ -104,20 +116,37 @@ class MonoString:
             indexes_strands = map(id2index_strand, ids)
             indexes, strands = zip(*indexes_strands)
 
+            sec_ids = sd_record.sec_monomer.to_list()
+            sec_indexes_strands = map(id2index_strand, sec_ids)
+            sec_indexes, sec_strands = zip(*sec_indexes_strands)
+
+            identities = sd_record.identity.to_list()
+            sec_identities = sd_record.sec_identity.to_list()
+
             monoinstances = []
-            for i, st, en, rel, strand, mono_index in \
+            for i, st, en, \
+                    rel, strand, sec_strand, \
+                    mono_index, sec_mono_index, \
+                    identity, sec_identity in \
                     zip(count(), starts, ends,
-                        reliabilities, strands, indexes):
+                        reliabilities, strands, sec_strands,
+                        indexes, sec_indexes,
+                        identities, sec_identities):
                 monomer = monomer_db.monomers[mono_index]
+                sec_monomer = monomer_db.monomers[sec_mono_index]
                 nucl_segment = nucl_sequence[st:en]
                 monoinstance = MonoInstance(monomer=monomer,
+                                            sec_monomer=sec_monomer,
                                             strand=strand,
+                                            sec_strand=sec_strand,
                                             seq_id=seq_id,
                                             nucl_segment=nucl_segment,
                                             st=st,
                                             en=en,
                                             seq_len=len(nucl_sequence),
-                                            reliability=rel)
+                                            reliability=rel,
+                                            identity=identity,
+                                            sec_identity=sec_identity)
                 monoinstances.append(monoinstance)
             return monoinstances
 
