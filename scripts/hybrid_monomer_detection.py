@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument("--threads", type=int, default=30)
     parser.add_argument("--outfile", required=True)
     parser.add_argument("--genome-len", type=int, required=True)
+    parser.add_argument("--isassembly", action='store_true')
     params = parser.parse_args()
     return params
 
@@ -47,7 +48,8 @@ def extract_hybrid(pair, sd_report, reads,
                    min_sec_ident,
                    threads,
                    coverage,
-                   sign_lev=0.05):
+                   sign_lev=0.05,
+                   isassembly=False):
     def extract_read_segms(sd_report, df, reads):
         segms = []
         for i, row in df.iterrows():
@@ -65,8 +67,11 @@ def extract_hybrid(pair, sd_report, reads,
                                for segm in segms)
         jumps = []
         for _, _, max_sc, sec_max_sc, jump, orient in results:
-            if max_sc >= sec_max_sc * 1.1:
-                jumps.append((jump[1:], orient))
+            print(max_sc, sec_max_sc, jump, orient)
+            if max_sc >= sec_max_sc * 1.05:
+                jump = jump[1:]
+                jumps.append((jump, orient))
+        # print(hybrids)
         return jumps
 
     def n_improved_pairs(segms, A, B, hybrid):
@@ -100,22 +105,44 @@ def extract_hybrid(pair, sd_report, reads,
     if len(read_segms) < coverage * 0.5:
         return results
 
+    import pandas as pd
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+        print(dfAB[['monomer', 'identity', 'sec_monomer', 'sec_identity']].head())
+
+    if isassembly:
+        assembly_segms = read_segms
+        jumps = Counter(get_cuts(assembly_segms, A, B))
+        if len(jumps) == 0:
+            return results
+        results["jumps"] = jumps
+        mc_jump = jumps.most_common(1)[0][0]
+        results["mc_jump"] = mc_jump
+        mc_jump, orient = mc_jump
+
+        if orient == '>':
+            hybrid = A[:mc_jump[0]] + B[mc_jump[1]:]
+        else:
+            hybrid = B[:mc_jump[0]] + A[mc_jump[1]:]
+        results["hybrid"] = hybrid
+        results["status"] = True
+        return results
+
     nreads = min(2000, len(read_segms)) // 2
+    print(f'nreads = {nreads}')
 
     results["ntrain"] = nreads
     results["ntest"] = nreads
 
-    # import pandas as pd
-    # with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
-    #     print(dfAB[['monomer', 'identity', 'sec_monomer', 'sec_identity']])
 
     train, test = read_segms[:nreads], read_segms[nreads:nreads*2]
     jumps = Counter(get_cuts(train, A, B))
     if len(jumps) == 0:
         return results
+    print(jumps)
     results["jumps"] = jumps
 
     mc_jump = jumps.most_common(1)[0]
+
     if mc_jump[1] < 5:
         return results
     results["mc_jump"] = mc_jump[0]
@@ -162,11 +189,15 @@ def main():
     print(f'Estimated coverage {coverage}x')
 
     putative_pairs = get_putative_pairs(sd_report.get_monomer_encoded_names())
+    # putative_pairs = [(1, 3)]
+    # print(sd_report.monomer_names_map['S2C2H1L.4'], sd_report.monomer_names_map['S2C2H1L.2'])
 
     hybrids = {}
     for pair in putative_pairs:
         a, b = pair
         print(pair)
+        print(sd_report.rev_monomer_names_map[a], sd_report.rev_monomer_names_map[b])
+
         A = sd_report.monomers[sd_report.rev_monomer_names_map[a]]
         B = sd_report.monomers[sd_report.rev_monomer_names_map[b]]
         extraction_res = extract_hybrid(pair, sd_report, reads,
@@ -174,7 +205,8 @@ def main():
                                         params.max_ident_diff,
                                         params.min_sec_ident,
                                         params.threads,
-                                        coverage)
+                                        coverage,
+                                        isassembly=params.isassembly)
         if extraction_res["status"]:
             pprint(extraction_res, width=1)
             print("")

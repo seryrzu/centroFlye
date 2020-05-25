@@ -8,8 +8,10 @@ import edlib
 from itertools import groupby
 import os
 import re
+import textwrap
 
 from joblib import Parallel, delayed
+
 from utils.various import weighted_random_by_dct
 
 
@@ -485,3 +487,70 @@ def group_cuts(s1, s2):
     for (st1, en1), (st2, en2) in m_regs:
         assert s1[st1:en1] == s2[st2:en2]
     return m_regs
+
+
+def print_alignment(s1, s2, k=None, mode='NW', width=60):
+    if k is None:
+        k = max(len(s1), len(s2))
+    alignment = edlib.align(s1, s2, task='path', k=k, mode=mode)
+    cigar = alignment['cigar']
+    locs = alignment['locations']
+    st, en = locs[0]
+    _, _, a1, a2 = parse_cigar(cigar, s1, s2[st:])
+    status = []
+    for c1, c2 in zip(a1, a2):
+        if c1 == c2:
+            status.append('|')
+        elif c1 == '-' or c2 == '-':
+            status.append('-')
+        elif c1 != c2:
+            status.append('X')
+        else:
+            assert False
+    a1 = ''.join(a1)
+    status = ''.join(status)
+    a2 = ''.join(a2)
+    
+    a1 = textwrap.wrap(a1, width=width)
+    status = textwrap.wrap(status, width=width)
+    a2 = textwrap.wrap(a2, width=width)
+
+    for wa1, wst, wa2 in zip(a1, status, a2):
+        print(wa1)
+        print(wst)
+        print(wa2)
+        print("")
+        
+
+def __perfect_overlap(s1, s2):
+    assert len(s1) >= len(s2)
+    if s1 == s2:
+        return s1
+
+    longest_overlap = ""
+    for i in range(len(s2)+1):
+        p1, p2 = s1[:i], s2[-i:]
+        if p1 == p2 and len(p1) >= len(longest_overlap):
+            longest_overlap = p1
+    for i in range(len(s1)-len(s2)+1):
+        p1, p2 = s1[i:i+len(s2)], s2
+        if p1 == p2 and len(p1) >= len(longest_overlap):
+            longest_overlap = p1
+    for i in range(len(s2)+1):
+        p1, p2 = s1[-i:], s2[:i]
+        if p1 == p2 and len(p1) >= len(longest_overlap):
+            longest_overlap = p1
+    return longest_overlap
+
+
+def perfect_overlap(s1, s2):
+    return __perfect_overlap(s1, s2) if len(s1) >= len(s2) else __perfect_overlap(s2, s1)
+
+
+# taken from https://stackoverflow.com/a/2894073
+def long_substr(data):
+    substrs = lambda x: {x[i:i+j] for i in range(len(x)) for j in range(len(x) - i + 1)}
+    s = substrs(data[0])
+    for val in data[1:]:
+        s.intersection_update(substrs(val))
+    return max(s, key=len)
