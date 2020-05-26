@@ -97,7 +97,8 @@ class MonoString:
         assert_monostring_validity(self)
 
     @classmethod
-    def from_sd_record(cls, seq_id, monomer_db, sd_record, nucl_sequence):
+    def from_sd_record(cls, seq_id, monomer_db, sd_record, nucl_sequence,
+                       min_ident_diff=0.0, max_ident_for_diff=1):
         def get_monoinstances(sd_record):
             def id2index_strand(monomer_id, monomer_db=monomer_db):
                 if monomer_id == cls.none_monomer:
@@ -113,10 +114,22 @@ class MonoString:
                 index = monomer_db.id2index[monomer_id]
                 return index, strand
 
+            def get_reliablities(sd_record, identities, sec_identities):
+                reliabilities = []
+                for raw_rel, ident, sec_ident in zip(sd_record.reliability,
+                                                     identities,
+                                                     sec_identities):
+                    reliability = Reliability(raw_rel)
+                    # reliability below is currently disabled
+                    if abs(ident - sec_ident) < min_ident_diff \
+                            and sec_ident > max_ident_for_diff:
+                        print(ident, sec_ident)
+                        reliability = Reliability.UNRELIABLE
+                    reliabilities.append(reliability)
+                return reliabilities
+
             starts = sd_record.s_st.to_list()
             ends = [en + 1 for en in sd_record.s_en]
-            reliabilities = [Reliability(raw_rel)
-                             for raw_rel in sd_record.reliability]
 
             ids = sd_record.monomer.to_list()
             indexes_strands = map(id2index_strand, ids)
@@ -126,8 +139,14 @@ class MonoString:
             sec_indexes_strands = map(id2index_strand, sec_ids)
             sec_indexes, sec_strands = zip(*sec_indexes_strands)
 
-            identities = sd_record.identity.to_list()
-            sec_identities = sd_record.sec_identity.to_list()
+            identities = [ident / 100
+                          for ident in sd_record.identity.to_list()]
+            sec_identities = [ident / 100
+                              for ident in sd_record.sec_identity.to_list()]
+
+            reliabilities = get_reliablities(sd_record=sd_record,
+                                             identities=identities,
+                                             sec_identities=sec_identities)
 
             monoinstances = []
             for i, st, en, \
