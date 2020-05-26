@@ -461,7 +461,9 @@ def calc_identity(a, b): # global alignment identity
     alignment = edlib.align(a, b, task='path')
     cigar, cigar_stats = parse_cigar(alignment['cigar'])
     alignment_len = sum(cigar_stats.values())
-    return 1 - alignment['editDistance'] / alignment_len
+    identity = 1 - alignment['editDistance'] / alignment_len
+    assert 0 <= identity <= 1
+    return identity
 
 
 def group_cuts(s1, s2):
@@ -510,7 +512,7 @@ def print_alignment(s1, s2, k=None, mode='NW', width=60):
     a1 = ''.join(a1)
     status = ''.join(status)
     a2 = ''.join(a2)
-    
+
     a1 = textwrap.wrap(a1, width=width)
     status = textwrap.wrap(status, width=width)
     a2 = textwrap.wrap(a2, width=width)
@@ -520,7 +522,7 @@ def print_alignment(s1, s2, k=None, mode='NW', width=60):
         print(wst)
         print(wa2)
         print("")
-        
+
 
 def __perfect_overlap(s1, s2):
     assert len(s1) >= len(s2)
