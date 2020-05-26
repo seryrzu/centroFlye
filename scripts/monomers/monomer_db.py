@@ -72,3 +72,8 @@ class MonomerDB:
 
     def get_size(self):
         return len(self.monomers)
+
+    def get_monomers_dict(self):
+        return {self.index2id[index]: monomer.seq
+                for index, monomer in enumerate(self.monomers)}
+
