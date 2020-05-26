@@ -34,17 +34,14 @@ def parse_args():
     return params
 
 
-def cluster_sequences(sequences, max_ident, logger=None):
+def cluster_sequences(sequences, max_ident):
     identities = {}
     graph = nx.Graph()
-    rev_map = {seq: s_id for s_id, seq in sequences.items()}
-    for s1 in rev_map:
-        s_id1 = rev_map[s1]
+    for s_id1, s1 in sequences.items():
         graph.add_node(s_id1)
-        for s2 in rev_map:
+        for s_id2, s2 in sequences.items():
             if s1 <= s2:
                 continue
-            s_id2 = rev_map[s2]
             ident = calc_identity(s1, s2)
             identities[(s_id1, s_id2)] = ident
             identities[(s_id2, s_id1)] = ident
@@ -73,7 +70,7 @@ def export_identities_heatmap(identities, outdir):
     heatmap.savefig(heatmap_fn, format='pdf')
 
 
-def export_clusters(clusters, sequences, outdir, sep='\t', logger=None):
+def export_clusters(clusters, sequences, outdir, sep='\t'):
     outfile = os.path.join(outdir, 'clusters.tsv')
     with open(outfile, 'w') as f:
         header = ['cluster', 's_id', 'sequence']
@@ -88,6 +85,7 @@ def main():
     params = parse_args()
     smart_makedirs(params.outdir)
     logfn = os.path.join(params.outdir, 'cluster_sequences.log')
+    global logger
     logger = get_logger(logfn,
                         logger_name='centroFlye: cluster sequences')
 
@@ -96,10 +94,10 @@ def main():
 
     sequences = read_bio_seqs(params.sequences)
     clusters, identities = \
-        cluster_sequences(sequences, params.max_ident, logger=logger)
+        cluster_sequences(sequences, params.max_ident)
     export_identities_heatmap(identities, params.outdir)
 
-    export_clusters(clusters, sequences, params.outdir, logger=logger)
+    export_clusters(clusters, sequences, params.outdir)
 
 
 if __name__ == "__main__":

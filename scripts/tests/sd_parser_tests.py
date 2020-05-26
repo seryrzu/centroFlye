@@ -75,7 +75,7 @@ class SDParserWOHPCTests(unittest.TestCase):
         self.sd_report = SD_Report(sd_report_fn=sd_report_wo_hpc_fn,
                                    monomers_fn=monomers_for_report_wo_hpc_fn,
                                    sequences_fn=sequences_for_report_wo_hpc_fn,
-                                   hpc=False)
+                                   hpc=False, cluster=False)
         super(SDParserWOHPCTests, self).__init__(*args, **kwargs)
 
     def test_sd_parser(self):

@@ -202,7 +202,7 @@ class MonoString:
 
         logger.debug(f'Finished construction raw_monostring for seq {seq_id}')
         logger.debug(f'    length of string = {len(string)}')
-        logger.debug(f'    string: {string}')
+        # logger.debug(f'    string: {string}')
 
         monostring = cls(seq_id=seq_id,
                          monoinstances=monoinstances,

@@ -2,11 +2,11 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+from collections import defaultdict
 import logging
 
-import numpy as np
-
 from utils.bio import read_bio_seqs
+from utils.cluster_sequences import cluster_sequences
 from utils.os_utils import expandpath
 
 logger = logging.getLogger("centroFlye.monomers.monomer_db")
@@ -24,26 +24,36 @@ class MonomerDB:
         self.id2index = id2index
         self.index2id = index2id
         self.monomers = monomers
-        for i, monomer in enumerate(self.monomers):
-            assert monomer.mono_index == i
 
     @classmethod
-    def from_fasta_file(cls, fn):
+    def from_fasta_file(cls, fn, cluster_max_ident=0.95, cluster=True):
         fn = expandpath(fn)
         logger.info(f'Creating Monomer DataBase from {fn}')
         raw_monomers = read_bio_seqs(fn)
+        logger.info(f'Clustering monomers.'
+                    f'Identity thresh {cluster_max_ident}')
+        if cluster:
+            monomer_clusters, _ = \
+                cluster_sequences(sequences=raw_monomers,
+                                  max_ident=cluster_max_ident)
+        else:
+            # if no clustering, each sequence will be in its own cluster
+            monomer_clusters = [[monomer_id] for monomer_id in raw_monomers]
+
         id2index = {}
-        index2id = {}
+        index2id = defaultdict(list)
         monomers = []
-        for i, (monomer_id, monomer_seq) in enumerate(raw_monomers.items()):
-            monomer = Monomer(monomer_id=monomer_id,
-                              mono_index=i,
-                              seq=monomer_seq)
-            monomers.append(monomer)
-            id2index[monomer_id] = i
-            index2id[i] = monomer_id
-            logger.debug(f'Monomer: index = {i}, id = {monomer_id}')
-            logger.debug(f'         monomer sequence = {monomer_seq}')
+        for i, cluster in enumerate(monomer_clusters):
+            for monomer_id in cluster:
+                monomer_seq = raw_monomers[monomer_id]
+                monomer = Monomer(monomer_id=monomer_id,
+                                  mono_index=i,
+                                  seq=monomer_seq)
+                monomers.append(monomer)
+                id2index[monomer_id] = i
+                index2id[i].append(monomer_id)
+                logger.debug(f'Monomer: index = {i} id = {monomer_id}')
+                logger.debug(f'         monomer sequence = {monomer_seq}')
 
         monomer_db = cls(id2index=id2index,
                          index2id=index2id,
@@ -54,26 +64,28 @@ class MonomerDB:
     def get_monomer_by_id(self, mono_id):
         return self.monomers[self.id2index[mono_id]]
 
-    def get_seq_by_index(self, mono_index):
-        assert 0 <= mono_index < len(self.monomers)
-        return self.monomers[mono_index].seq
+    def get_monomers_by_index(self, mono_index):
+        for monomer_id in self.index2id[mono_index]:
+            yield self.monomers[monomer_id]
+
+    def get_seqs_by_index(self, mono_index):
+        assert 0 <= mono_index <= max(self.index2id)
+        for monomer in self.get_monomers_by_index(mono_index):
+            yield monomer.seq
 
     def get_seq_by_id(self, monomer_id):
         mono_index = self.id2index[monomer_id]
         return self.monomers[mono_index].seq
 
     def get_monoindexes(self):
-        indexes = self.index2id.keys()
-        return list(indexes)
+        return self.index2id.keys()
 
     def get_ids(self):
-        ids_generator = self.id2index.keys()
-        return list(ids_generator)
+        return self.id2index.keys()
 
     def get_size(self):
-        return len(self.monomers)
+        return 1 + max(self.index2id)
 
     def get_monomers_dict(self):
-        return {self.index2id[index]: monomer.seq
-                for index, monomer in enumerate(self.monomers)}
-
+        return {monomer.monomer_id: monomer.seq
+                for monomer in self.monomers}
