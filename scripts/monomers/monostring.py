@@ -84,6 +84,7 @@ class MonoString:
     # monostring is stored as a list because |monomer_db| often exceeds |ascii|
     gap_symb = '?'
     reverse_symb = "'"
+    none_monomer = 'None'
 
     def __init__(self, seq_id, monoinstances, raw_monostring, nucl_sequence,
                  monomer_db, is_reversed):
@@ -99,6 +100,11 @@ class MonoString:
     def from_sd_record(cls, seq_id, monomer_db, sd_record, nucl_sequence):
         def get_monoinstances(sd_record):
             def id2index_strand(monomer_id, monomer_db=monomer_db):
+                if monomer_id == cls.none_monomer:
+                    index = None
+                    strand = Strand.FORWARD
+                    return index, strand
+
                 if monomer_id[-1] == cls.reverse_symb:
                     monomer_id = monomer_id[:-1]
                     strand = Strand.REVERSE
@@ -133,7 +139,9 @@ class MonoString:
                         indexes, sec_indexes,
                         identities, sec_identities):
                 monomer = monomer_db.monomers[mono_index]
-                sec_monomer = monomer_db.monomers[sec_mono_index]
+                sec_monomer = None
+                if sec_mono_index is not None:
+                    sec_monomer = monomer_db.monomers[sec_mono_index]
                 nucl_segment = nucl_sequence[st:en]
                 monoinstance = MonoInstance(monomer=monomer,
                                             sec_monomer=sec_monomer,
