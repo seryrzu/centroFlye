@@ -20,10 +20,11 @@ class Monomer:
 
 
 class MonomerDB:
-    def __init__(self, id2index, index2id, monomers):
+    def __init__(self, id2index, index2id, monomers, id2list_coord):
         self.id2index = id2index
         self.index2id = index2id
         self.monomers = monomers
+        self.id2list_coord = id2list_coord
 
     @classmethod
     def from_fasta_file(cls, fn, cluster_max_ident=0.95, cluster=True):
@@ -43,6 +44,7 @@ class MonomerDB:
         id2index = {}
         index2id = defaultdict(list)
         monomers = []
+        id2list_coord = {}
         for i, cluster in enumerate(monomer_clusters):
             for monomer_id in cluster:
                 monomer_seq = raw_monomers[monomer_id]
@@ -52,12 +54,15 @@ class MonomerDB:
                 monomers.append(monomer)
                 id2index[monomer_id] = i
                 index2id[i].append(monomer_id)
+                id2list_coord[monomer_id] = len(monomers) - 1
                 logger.debug(f'Monomer: index = {i} id = {monomer_id}')
                 logger.debug(f'         monomer sequence = {monomer_seq}')
 
         monomer_db = cls(id2index=id2index,
                          index2id=index2id,
-                         monomers=monomers)
+                         monomers=monomers,
+                         id2list_coord=id2list_coord)
+
         logger.info(f'Finished Creating Monomer DataBase')
         return monomer_db
 
@@ -65,8 +70,9 @@ class MonomerDB:
         return self.monomers[self.id2index[mono_id]]
 
     def get_monomers_by_index(self, mono_index):
-        for monomer_id in self.index2id[mono_index]:
-            yield self.monomers[monomer_id]
+        for mono_id in self.index2id[mono_index]:
+            list_coord = self.id2list_coord[mono_id]
+            yield self.monomers[list_coord]
 
     def get_seqs_by_index(self, mono_index):
         assert 0 <= mono_index <= max(self.index2id)
