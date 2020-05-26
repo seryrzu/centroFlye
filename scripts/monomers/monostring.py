@@ -256,6 +256,12 @@ class MonoString:
                                   mink=mink, maxk=maxk,
                                   ignored_chars=set([self.gap_symb]))
 
+    def get_identities(self):
+        identities = []
+        for mi in self.monoinstances:
+            identities.append(mi.identity)
+        return identities
+
 
 def assert_monostring_validity(monostring):
     string = monostring.raw_monostring
