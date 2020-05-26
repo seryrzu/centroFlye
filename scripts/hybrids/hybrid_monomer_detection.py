@@ -10,6 +10,7 @@ from sd_parser import SD_Report
 from utils.bio import read_bio_seqs, hybrid_alignment, RC, \
                       calc_identity, write_bio_seqs
 
+# TODO: update this script with new API
 
 def parse_args():
     parser = argparse.ArgumentParser()
