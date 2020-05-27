@@ -34,8 +34,8 @@ def parse_args():
     parser.add_argument("--threads", type=int, default=30)
     parser.add_argument("--score-mult", type=float, default=1.1)
     parser.add_argument("--max-sim", type=float, default=.95)
-    parser.add_argument("--ident-mov-av-len", type=int, default=10)
-    parser.add_argument("--min-moving-identity", type=int, default=.9)
+    parser.add_argument("--ident-mov-av-len", type=int, default=30)
+    parser.add_argument("--min-moving-identity", type=int, default=.95)
     params = parser.parse_args()
     return params
 
@@ -53,7 +53,7 @@ def get_candidates(monoassembly,
     for pos, ident_running_mean in enumerate(identities_running_mean):
         if ident_running_mean < min_moving_identity:
             continue
-        mi = monoassembly.monoinstances[pos]
+        mi = monoassembly.monoinstances[ident_mov_av_len+pos]
         ident_diff = abs(mi.identity - mi.sec_identity)
         if mi.is_reliable() and \
                 mi.sec_identity >= min_sec_ident and \
@@ -80,8 +80,9 @@ def get_candidates(monoassembly,
 
 def filter_hybrid_alignments(hybrid_aligns, candidates,
                              score_mult, max_sim, logger):
-    hybrids2info = {}
+    hybrids2info, info2hybrids = {}, {}
     hybrids2pos = defaultdict(list)
+    pair2jumps = defaultdict(set)
     for i, (_, _, max_sc, sec_sc, jump, orient) in enumerate(hybrid_aligns):
         if max_sc >= sec_sc * score_mult:
             jump = jump[1:]
@@ -102,8 +103,38 @@ def filter_hybrid_alignments(hybrid_aligns, candidates,
                 logger.info(f'ident(hybrid, b)={ident_HB:0.2}')
                 logger.info(f'maxscore={max_sc} secmaxscore = {sec_sc}')
                 logger.info('---')
-                hybrids2info[hybrid] = (a, b, jump)
+                info = (a, b, jump)
+                hybrids2info[hybrid] = info
+                info2hybrids[info] = hybrid
+                pair2jumps[(a, b)].add(jump)
                 hybrids2pos[hybrid].append(pos)
+
+    main_hybrids2pos, main_hybrids2info = {}, {}
+    for pair, jumps in pair2jumps.items():
+        if len(jumps) == 1:
+            continue
+        pair_hybrids_mult = {}
+        all_pos = []
+        for jump in jumps:
+            info = (*pair, jump)
+            hybrid = info2hybrids[info]
+            positions = hybrids2pos[hybrid]
+            pair_hybrids_mult[hybrid] = len(positions)
+            all_pos += positions
+        all_pos.sort()
+
+        pop_hybrid = max(pair_hybrids_mult, key=pair_hybrids_mult.get)
+        _, _, pop_jump = hybrids2info[pop_hybrid]
+        logger.info(f'For pair {pair} selected jump: {pop_jump} '
+                    f'all jumps: {jumps}')
+        for jump in jumps:
+            info = (*pair, jump)
+            hybrid = info2hybrids[info]
+            if jump == pop_jump:
+                main_hybrids2pos[hybrid] = all_pos
+                main_hybrids2info[hybrid] = info
+    hybrids2pos, hybrids2info = main_hybrids2pos, main_hybrids2info
+
     logger.info('---')
     logger.info('Summary of extracted hybrids')
     for hybrid, info in hybrids2info.items():
