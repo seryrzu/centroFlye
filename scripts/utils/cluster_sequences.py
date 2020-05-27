@@ -11,6 +11,7 @@ import sys
 this_dirname = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
+import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 import seaborn as sns
@@ -29,7 +30,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sequences", required=True, help="Sequences")
     parser.add_argument("--outdir", required=True, )
-    parser.add_argument("--max-ident", type=float, default=0.9)
+    parser.add_argument("--max-ident", type=float, default=0.95)
     params = parser.parse_args()
     return params
 
@@ -66,6 +67,7 @@ def export_identities_heatmap(identities, outdir):
                           vmin=60, vmax=100,
                           annot=True,
                           cmap="YlGnBu").get_figure()
+    plt.tight_layout()
     heatmap_fn = os.path.join(outdir, 'identity_heatmap.pdf')
     heatmap.savefig(heatmap_fn, format='pdf')
 
