@@ -29,13 +29,13 @@ def parse_args():
     parser.add_argument("--monomers", required=True, help="Monomers")
     parser.add_argument("--assembly", required=True, help="Assembly")
     parser.add_argument("--outdir", required=True)
-    parser.add_argument("--max-ident-diff", type=int, default=4)
-    parser.add_argument("--min-sec-ident", type=float, default=75)
+    parser.add_argument("--max-ident-diff", type=int, default=.04)
+    parser.add_argument("--min-sec-ident", type=float, default=.75)
     parser.add_argument("--threads", type=int, default=30)
     parser.add_argument("--score-mult", type=float, default=1.1)
-    parser.add_argument("--max-sim", type=float, default=0.95)
+    parser.add_argument("--max-sim", type=float, default=.95)
     parser.add_argument("--ident-mov-av-len", type=int, default=10)
-    parser.add_argument("--min-moving-identity", type=int, default=90)
+    parser.add_argument("--min-moving-identity", type=int, default=.9)
     params = parser.parse_args()
     return params
 
@@ -60,8 +60,18 @@ def get_candidates(monoassembly,
                 ident_diff <= max_ident_diff:
             a = mi.get_monoid()
             b = mi.get_secmonoid()
-            A = monoassembly.monomer_db.get_seq_by_index(mi.get_monoindex())
-            B = monoassembly.monomer_db.get_seq_by_index(mi.get_secmonoindex())
+            mono_ind1, mono_ind2 = mi.get_monoindex(), mi.get_secmonoindex()
+            if mono_ind1 == mono_ind2:
+                continue
+
+            A = monoassembly.monomer_db.get_seqs_by_index(mi.get_monoindex())
+            B = monoassembly.monomer_db.get_seqs_by_index(mi.get_secmonoindex())
+            A, B = list(A), list(B)
+            if len(A) > 1 or len(B) > 1:
+                continue
+            # only work with clusters of size 1
+            A, B = A[0], B[0]
+
             candidates.append((pos, mi.nucl_segment, a, b, A, B))
             logger.info(f'pos={pos} ident={mi.identity}, '
                         f'sec_ident={mi.sec_identity} {a} {b}')
