@@ -123,12 +123,13 @@ class MonoStringSet:
         if return_stats:
             return stats
 
-    def get_kmer_index(self, mink, maxk):
+    def get_kmer_index(self, mink, maxk, positions=False):
         assert len(self.monostrings) > 0
         gap_symb = fst_iterable(self.monostrings.values()).gap_symb
-        return get_kmer_index(seqs=self.monostrings.values(),
+        return get_kmer_index(seqs=self.monostrings,
                               mink=mink, maxk=maxk,
-                              ignored_chars=set([gap_symb]))
+                              ignored_chars=set([gap_symb]),
+                              positions=positions)
 
     def keys(self):
         return self.monostrings.keys()
