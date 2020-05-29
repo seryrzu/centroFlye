@@ -146,7 +146,8 @@ and start recruitment (`<path_to_CHM13>` is where the ONT reads are located, see
 bash scripts/read_recruitment/run_read_recruitment.sh \
        <path_to_CHM13>/rel3.fastq.gz \
        results_cen6/centromeric_reads 50 29000000 \
-       supplementary_data/D6Z1.fasta
+       supplementary_data/D6Z1.fasta \
+       550
 ```
 **Required resources**:
 + Storage space: 150GB
