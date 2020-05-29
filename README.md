@@ -111,7 +111,7 @@ The steps below describe how to apply it to cen6 assembly.
 
 If you want to run the whole centroFlyeMono pipeline to generate cen6 assembly with one command, please run
 ```
-./run_all_cen6.sh <path_to_CHM13> results_cenX 50
+./run_all_cen6.sh <path_to_CHM13> results_cen6 50
 ```
 You can customize the output directory and the number of threads:
 ```
