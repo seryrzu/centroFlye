@@ -1,3 +1,6 @@
 [submodule "scripts/ext/tandemQUAST"]
 	path = scripts/ext/tandemQUAST
 	url = git@github.com:ablab/tandemQUAST.git
+[submodule "scripts/ext/stringdecomposer"]
+	path = scripts/ext/stringdecomposer
+	url = git@github.com:ablab/stringdecomposer.git
