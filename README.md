@@ -7,6 +7,11 @@ Currently it supports assembly of a human centromere 6 (referred to as cen6) and
 Here we show how to apply it for the cen6 and cenX of the CHM13hTERT human cell line.
 The comparison of various cenX assemblies can be found in Bzikadze et al., 2019 and Mikheenko et al., 2019.
 
+## Cloning
+Please clone this repo with submodules:
+```
+git clone --recurse-submodules git@github.com:seryrzu/centroFlye.git
+```
 
 ## Dependencies
 
