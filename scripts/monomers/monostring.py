@@ -208,7 +208,7 @@ class MonoString:
                     string.append(cls.gap_symb)
             return string
 
-        logger.debug(f'Constructing raw_monostring for sequence {seq_id}')
+        # logger.debug(f'Constructing raw_monostring for sequence {seq_id}')
 
         # Trim first and last monomer because they are often unreliable
         sd_record = sd_record[1:-1]
@@ -219,8 +219,8 @@ class MonoString:
             reverse_if_needed(monoinstances, nucl_sequence)
         string = get_string(monoinstances)
 
-        logger.debug(f'Finished construction raw_monostring for seq {seq_id}')
-        logger.debug(f'    length of string = {len(string)}')
+        # logger.debug(f'Finished construction raw_monostring for seq {seq_id}')
+        # logger.debug(f'    length of string = {len(string)}')
         # logger.debug(f'    string: {string}')
 
         monostring = cls(seq_id=seq_id,

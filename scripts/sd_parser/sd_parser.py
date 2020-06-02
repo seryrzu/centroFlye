@@ -17,7 +17,7 @@ logger = logging.getLogger("centroFlye.sd_parser.sd_parser")
 
 class SD_Report:
     def __init__(self, sd_report_fn, monomers_fn, sequences_fn,
-                 hpc=True, cluster=True):
+                 hpc=True, cluster=True, correct_hybrids=False):
         logger.info('Reading SD Report')
         logger.info(f'    sd_report_fn = {sd_report_fn}')
         logger.info(f'    monomers_fn  = {monomers_fn}')
@@ -50,9 +50,11 @@ class SD_Report:
         logger.info('Reading sequences')
         sequences = read_bio_seqs(sequences_fn)
         logger.info('Finished reading sequences')
-        monostring_set = MonoStringSet.from_sd_report(report=report,
-                                                      sequences=sequences,
-                                                      monomer_db=monomer_db)
+        monostring_set = \
+            MonoStringSet.from_sd_report(report=report,
+                                         sequences=sequences,
+                                         monomer_db=monomer_db,
+                                         correct_hybrids=correct_hybrids)
 
         logger.info('Creating monostrings dict')
         logger.info('Finished creating monostrings dict')

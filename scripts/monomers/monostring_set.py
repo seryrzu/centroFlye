@@ -8,7 +8,8 @@ import logging
 import numpy as np
 
 from monomers.monostring import MonoString
-from utils.kmers import get_kmer_index
+from utils.kmers import get_kmer_index, def_get_min_mult, \
+    def_get_frequent_kmers, correct_kmers
 from utils.bio import compress_homopolymer
 from utils.various import fst_iterable
 
@@ -20,10 +21,12 @@ class MonoStringSet:
         self.monostrings = monostrings
         self.monostrings_filt_out = monostrings_filt_out
         self.monomer_db = monomer_db
+        self.hybrids_corrected = False
         self.get_stats()
 
     @classmethod
-    def from_sd_report(cls, report, sequences, monomer_db):
+    def from_sd_report(cls, report, sequences, monomer_db,
+                       correct_hybrids=False):
         def get_raw_monostrings(report=report,
                                 sequences=sequences,
                                 monomer_db=monomer_db):
@@ -57,6 +60,8 @@ class MonoStringSet:
         monostring_set = cls(monostrings=monostrings,
                              monostrings_filt_out=monostrings_filt_out,
                              monomer_db=monomer_db)
+        if correct_hybrids:
+            monostring_set.correct_likely_hybrids()
         return monostring_set
 
     def get_nucl_seq(self, seq_id):
@@ -139,3 +144,69 @@ class MonoStringSet:
 
     def items(self):
         return self.monostrings.items()
+
+    def correct_likely_hybrids(self, k=101):
+        # This function is not used
+        kmer_index_w_pos = self.get_kmer_index(mink=k,
+                                            maxk=k,
+                                            positions=True)
+        kmer_index_w_pos = kmer_index_w_pos[k]
+
+        k2 = k//2
+        while True:
+            # kmer_index_wo_pos = {kmer: len(pos)
+            #                      for kmer, pos in kmer_index_w_pos.items()}
+
+            # # TODO add mode
+            # min_mult = def_get_min_mult(k=k, mode='ont')
+            # frequent_kmers = \
+            #     def_get_frequent_kmers(kmer_index_wo_pos,
+            #                            string_set=self,
+            #                            min_mult=min_mult)
+            # frequent_kmers_w_pos = {kmer: kmer_index_w_pos[kmer]
+            #                         for kmer in frequent_kmers}
+            top_subst = correct_kmers(kmer_index_w_pos=kmer_index_w_pos,
+                                      string_set=self)
+            if top_subst is None:
+                break
+            kmer, mono_index = top_subst
+            print(kmer, mono_index)
+            for s_id, pos in kmer_index_w_pos[kmer].copy():
+                print(s_id, pos)
+                monostring = self.monostrings[s_id]
+
+                bottom = max(0, pos-k2)
+                top = 1 + min(pos+k2, len(monostring)-k)
+                for p in range(bottom, top):
+                    i = pos-p+k2
+                    p_kmer = tuple(monostring[p:p+k])
+                    mut_kmer = list(p_kmer)
+                    mut_kmer[i] = mono_index
+                    mut_kmer = tuple(mut_kmer)
+                    if (s_id, p) in kmer_index_w_pos[p_kmer]:
+                        kmer_index_w_pos[mut_kmer].add((s_id, p))
+                        kmer_index_w_pos[p_kmer].remove((s_id, p))
+                to_remove = []
+                for kmer in kmer_index_w_pos:
+                    if len(kmer_index_w_pos[kmer]) == 0:
+                        to_remove.append(kmer)
+                for kmer in to_remove:
+                    del kmer_index_w_pos[kmer]
+
+
+                change_pos = pos + k2
+                monostring.raw_monostring[change_pos] = mono_index
+
+            # assert_kmer_index_w_pos = self.get_kmer_index(mink=k,
+            #                                     maxk=k,
+            #                                     positions=True)
+            # assert_kmer_index_w_pos = assert_kmer_index_w_pos[k]
+            # for kmer in kmer_index_w_pos:
+            #     if kmer_index_w_pos[kmer] != assert_kmer_index_w_pos[kmer]:
+            #         print(kmer_index_w_pos[kmer] - assert_kmer_index_w_pos[kmer])
+            #         print(assert_kmer_index_w_pos[kmer] - kmer_index_w_pos[kmer])
+            # assert kmer_index_w_pos == assert_kmer_index_w_pos
+            print("")
+
+        self.hybrids_corrected = True
+
