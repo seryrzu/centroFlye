@@ -145,6 +145,28 @@ class MonoStringSet:
     def items(self):
         return self.monostrings.items()
 
+    def make_corrections(self, string_pairs, k):
+        kmer_index_w_pos = self.get_kmer_index(mink=k,
+                                               maxk=k,
+                                               positions=True)
+        kmer_index_w_pos = kmer_index_w_pos[k]
+
+        readpos_to_change = set()
+        for str1, str2 in string_pairs:
+            diff = [i for i, (a, b) in enumerate(zip(str1, str2)) if a != b]
+            for d in diff:
+                bottom = max(0, d-k)
+                top = 1 + min(d+k, len(str1)-k)
+                for p in range(bottom, top):
+                    i = d-p
+                    assert 0 <= i < k
+                    kmer = tuple(str1[p:p+k])
+                    for (s_id, s) in kmer_index_w_pos[kmer]:
+                        readpos_to_change.add((s_id, s+i, str2[d]))
+                        assert self.monostrings[s_id][s+i] == str1[d]
+        for s_id, p, mono_index in readpos_to_change:
+            self.monostrings[s_id][p] = mono_index
+
     def correct_likely_hybrids(self, k=101):
         # This function is not used
         kmer_index_w_pos = self.get_kmer_index(mink=k,

@@ -4,6 +4,7 @@
 
 import logging
 
+from collections import defaultdict
 import networkx as nx
 import numpy as np
 
@@ -16,12 +17,14 @@ class DeBruijnGraph(SequenceGraph):
     coverage = 'coverage'
 
     def __init__(self, nx_graph, nodeindex2label, nodelabel2index, k,
-                 collapse=True):
+                 collapse=True, resolve_bubbles=True):
         super().__init__(nx_graph=nx_graph,
                          nodeindex2label=nodeindex2label,
                          nodelabel2index=nodelabel2index,
                          collapse=collapse)
         self.k = k  # length of an edge in the uncompressed graph
+        if resolve_bubbles:
+            self.resolve_bubbles()
 
     @classmethod
     def _generate_label(cls, par_dict):
@@ -34,7 +37,7 @@ class DeBruijnGraph(SequenceGraph):
 
     @classmethod
     def from_kmers(cls, kmers, kmer_coverages=None,
-                   min_tip_cov=1, collapse=True):
+                   min_tip_cov=1, collapse=True, resolve_bubbles=False):
         def add_kmer(kmer, coverage=1, color='black'):
             prefix, suffix = kmer[:-1], kmer[1:]
 
@@ -112,7 +115,8 @@ class DeBruijnGraph(SequenceGraph):
                        nodeindex2label=nodeindex2label,
                        nodelabel2index=nodelabel2index,
                        k=k,
-                       collapse=collapse)
+                       collapse=collapse,
+                       resolve_bubbles=resolve_bubbles)
         return db_graph
 
     def _add_edge(self, node, color, string,
@@ -174,3 +178,27 @@ class DeBruijnGraph(SequenceGraph):
                 kmer = tuple(kmer)
                 kmers[kmer] = coverage[i]
         return kmers
+
+    def resolve_bubbles(self, max_diff=1):
+        edge2strCov = defaultdict(list)
+        for s, e, key, data in self.nx_graph.edges(keys=True, data=True):
+            assert len(edge2strCov[(s, e)]) == key
+            string = data[self.string]
+            coverage = np.mean(data[self.coverage])
+            edge2strCov[(s, e)].append((string, coverage))
+        edge2strCov = {edge: tuple(v) for edge, v in edge2strCov.items()
+                       if len(v) == 2 and len(v[0][0]) == len(v[1][0])}
+
+        resolved_bubbles = []
+        for (s, e), ((str1, cov1), (str2, cov2)) in edge2strCov.items():
+            diff = [i for i, (a, b) in enumerate(zip(str1, str2)) if a != b]
+            if len(diff) > max_diff:
+                continue
+            if cov1 >= cov2:
+                self.nx_graph.remove_edge(s, e, 1)
+                resolved_bubbles.append((str2, str1))
+            else:
+                self.nx_graph.remove_edge(s, e, 0)
+                resolved_bubbles.append((str1, str2))
+        self.collapse_nonbranching_paths()
+        return resolved_bubbles

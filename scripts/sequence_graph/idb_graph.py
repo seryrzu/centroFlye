@@ -73,6 +73,12 @@ def get_idb(string_set,
         db = DeBruijnGraph.from_kmers(kmers=frequent_kmers.keys(),
                                       kmer_coverages=frequent_kmers,
                                       min_tip_cov=min_mult)
+        while True:
+            resolved_bubbles = db.resolve_bubbles()
+            if len(resolved_bubbles) == 0:
+                break
+            logger.info(f'Resolved {len(resolved_bubbles)} bubbles')
+            string_set.make_corrections(string_pairs=resolved_bubbles, k=k)
 
         ncc = nx.number_weakly_connected_components(db.nx_graph)
         logger.info(f'#cc = {ncc}')
@@ -110,7 +116,6 @@ def get_idb_monostring_set(string_set,
                            get_frequent_kmers=None,
                            all_kmer_index=None,
                            step=1):
-    # TODO: check that works for submonostring_set
     if all_kmer_index is None:
         all_kmer_index = string_set.get_kmer_index(mink=mink, maxk=maxk)
 
