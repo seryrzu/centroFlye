@@ -94,6 +94,7 @@ class MonoString:
         self.nucl_sequence = nucl_sequence
         self.monomer_db = monomer_db
         self.is_reversed = is_reversed
+        self.corrections = {}  # dict pos (int) -> mono_index (int)
         assert_monostring_validity(self)
 
     @classmethod
@@ -123,7 +124,6 @@ class MonoString:
                     # reliability below is currently disabled
                     if abs(ident - sec_ident) < min_ident_diff \
                             and sec_ident > max_ident_for_diff:
-                        print(ident, sec_ident)
                         reliability = Reliability.UNRELIABLE
                     reliabilities.append(reliability)
                 return reliabilities
@@ -239,6 +239,16 @@ class MonoString:
             sublist = self.raw_monostring[sub.start:sub.stop:sub.step]
             return sublist
         return self.raw_monostring[sub]
+
+    def __setitem__(self, sub, item):
+        # sub - position
+        # item - mono_index
+        assert self.raw_monostring[sub] != item
+        self.corrections[sub] = (self.raw_monostring[sub], item)
+        self.raw_monostring[sub] = item
+
+    def is_corrected(self):
+        return len(self.corrections)
 
     def get_perc_reliable(self):
         is_reliable = [monoinstance.is_reliable()
