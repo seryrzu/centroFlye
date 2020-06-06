@@ -16,9 +16,20 @@ logger = logging.getLogger("centroFlye.sd_parser.sd_parser")
 
 
 class SD_Report:
-    def __init__(self, sd_report_fn, monomers_fn, sequences_fn,
-                 hpc=True, cluster=True, correct_hybrids=False):
+    def __init__(self, sd_report_fn, monomers_fn, sequences_fn, mode,
+                 hpc=True, cluster=True, correct_hybrids=None):
         logger.info('Reading SD Report')
+
+        assert mode in ['ont', 'hifi', 'assembly']
+        if correct_hybrids is None:
+            correct_hybrids = False  # correction of hybrids is disabled
+            # if mode == 'assembly':
+            #     correct_hybrids = False
+            # else:
+            #     correct_hybrids = True
+
+        logger.info(f'Mode is {mode}')
+
         logger.info(f'    sd_report_fn = {sd_report_fn}')
         logger.info(f'    monomers_fn  = {monomers_fn}')
         logger.info(f'    sequences_fn = {sequences_fn}')
@@ -54,6 +65,7 @@ class SD_Report:
             MonoStringSet.from_sd_report(report=report,
                                          sequences=sequences,
                                          monomer_db=monomer_db,
+                                         mode=mode,
                                          correct_hybrids=correct_hybrids)
 
         logger.info('Creating monostrings dict')

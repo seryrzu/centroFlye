@@ -8,6 +8,7 @@ import logging
 import numpy as np
 
 from monomers.monostring import MonoString
+from sequence_graph.db_graph import DeBruijnGraph
 from utils.kmers import get_kmer_index, def_get_min_mult, \
     def_get_frequent_kmers, correct_kmers
 from utils.bio import compress_homopolymer
@@ -17,15 +18,16 @@ logger = logging.getLogger("centroFlye.monomers.monostring_set")
 
 
 class MonoStringSet:
-    def __init__(self, monostrings, monostrings_filt_out, monomer_db):
+    def __init__(self, monostrings, monostrings_filt_out, monomer_db, mode):
         self.monostrings = monostrings
         self.monostrings_filt_out = monostrings_filt_out
         self.monomer_db = monomer_db
+        self.mode = mode
         self.hybrids_corrected = False
         self.get_stats()
 
     @classmethod
-    def from_sd_report(cls, report, sequences, monomer_db,
+    def from_sd_report(cls, report, sequences, monomer_db, mode,
                        correct_hybrids=False):
         def get_raw_monostrings(report=report,
                                 sequences=sequences,
@@ -54,12 +56,14 @@ class MonoStringSet:
                     bad_monostrings[seq_id] = ms
             return good_monostrings, bad_monostrings
 
+        assert mode in ['ont', 'hifi', 'assembly']
         unfiltered_monostrings = get_raw_monostrings()
         monostrings, monostrings_filt_out = \
             filter_monostrings(unfiltered_monostrings)
         monostring_set = cls(monostrings=monostrings,
                              monostrings_filt_out=monostrings_filt_out,
-                             monomer_db=monomer_db)
+                             monomer_db=monomer_db,
+                             mode=mode)
         if correct_hybrids:
             monostring_set.correct_likely_hybrids()
         return monostring_set
@@ -145,33 +149,56 @@ class MonoStringSet:
     def items(self):
         return self.monostrings.items()
 
-    def make_corrections(self, string_pairs, k):
-        kmer_index_w_pos = self.get_kmer_index(mink=k,
-                                               maxk=k,
-                                               positions=True)
-        kmer_index_w_pos = kmer_index_w_pos[k]
+    def correct_likely_hybrids(self, k=100,
+                               get_frequent_kmers=def_get_frequent_kmers,
+                               get_min_mult=def_get_min_mult):
+        if self.hybrids_corrected:
+            return
 
-        readpos_to_change = set()
-        for str1, str2 in string_pairs:
-            diff = [i for i, (a, b) in enumerate(zip(str1, str2)) if a != b]
-            for d in diff:
-                bottom = max(0, d-k)
-                top = 1 + min(d+k, len(str1)-k)
-                for p in range(bottom, top):
-                    i = d-p
-                    assert 0 <= i < k
-                    kmer = tuple(str1[p:p+k])
-                    for (s_id, s) in kmer_index_w_pos[kmer]:
-                        readpos_to_change.add((s_id, s+i, str2[d]))
-                        assert self.monostrings[s_id][s+i] == str1[d]
-        for s_id, p, mono_index in readpos_to_change:
-            self.monostrings[s_id][p] = mono_index
+        while True:
+            kmer_index_w_pos = self.get_kmer_index(mink=k,
+                                                   maxk=k,
+                                                   positions=True)
+            kmer_index_w_pos = kmer_index_w_pos[k]
+            kmer_index_wo_pos = {kmer: len(pos)
+                                for kmer, pos in kmer_index_w_pos.items()}
 
-    def correct_likely_hybrids(self, k=101):
+            min_mult = get_min_mult(k=k, mode=self.mode)
+            frequent_kmers = get_frequent_kmers(kmer_index=kmer_index_wo_pos,
+                                                string_set=self,
+                                                min_mult=min_mult)
+
+            db = DeBruijnGraph.from_kmers(kmers=frequent_kmers.keys(),
+                                        kmer_coverages=frequent_kmers,
+                                        min_tip_cov=min_mult)
+
+            bubbles = db.detect_bubbles()
+
+            if len(bubbles) == 0:
+                break
+
+            readpos_to_change = set()
+            for str1, str2 in bubbles:
+                diff = [i for i, (a, b) in enumerate(zip(str1, str2)) if a != b]
+                for d in diff:
+                    bottom = max(0, d-k)
+                    top = 1 + min(d+k, len(str1)-k)
+                    for p in range(bottom, top):
+                        i = d-p
+                        assert 0 <= i < k
+                        kmer = tuple(str1[p:p+k])
+                        assert kmer in kmer_index_w_pos
+                        for (s_id, s) in kmer_index_w_pos[kmer]:
+                            readpos_to_change.add((s_id, s+i, str2[d]))
+                            assert self.monostrings[s_id][s+i] == str1[d]
+            for s_id, p, mono_index in readpos_to_change:
+                self.monostrings[s_id][p] = mono_index
+
+        self.hybrids_corrected = True
+
+    def correct_likely_hybrids_depr(self, k=101):
         # This function is not used
-        kmer_index_w_pos = self.get_kmer_index(mink=k,
-                                            maxk=k,
-                                            positions=True)
+        kmer_index_w_pos = self.get_kmer_index(mink=k, maxk=k, positions=True)
         kmer_index_w_pos = kmer_index_w_pos[k]
 
         k2 = k//2
@@ -215,7 +242,6 @@ class MonoStringSet:
                 for kmer in to_remove:
                     del kmer_index_w_pos[kmer]
 
-
                 change_pos = pos + k2
                 monostring.raw_monostring[change_pos] = mono_index
 
@@ -231,4 +257,3 @@ class MonoStringSet:
             print("")
 
         self.hybrids_corrected = True
-

@@ -5,7 +5,7 @@
 from collections import Counter, defaultdict
 import logging
 
-from utils.various import fst_iterable
+from utils.various import fst_iterable, index
 
 logger = logging.getLogger("centroFlye.utils.kmers")
 
@@ -196,3 +196,14 @@ def correct_kmers(kmer_index_w_pos, string_set,
             top_subst = (kmer2, mono_ind1)
     print(f'Top gain = {top_gain}')
     return top_subst
+
+
+def keep_shortest_lists(lst):
+    to_remove = set()
+    for l1 in lst:
+        for l2 in lst:
+            if l1 == l2:
+                continue
+            if len(index(l1, l2)):
+                to_remove.add(l1)
+    return [l for l in lst if l not in to_remove]

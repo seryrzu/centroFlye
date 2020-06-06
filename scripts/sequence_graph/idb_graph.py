@@ -73,13 +73,6 @@ def get_idb(string_set,
         db = DeBruijnGraph.from_kmers(kmers=frequent_kmers.keys(),
                                       kmer_coverages=frequent_kmers,
                                       min_tip_cov=min_mult)
-        while True:
-            resolved_bubbles = db.resolve_bubbles()
-            if len(resolved_bubbles) == 0:
-                break
-            logger.info(f'Resolved {len(resolved_bubbles)} bubbles')
-            string_set.make_corrections(string_pairs=resolved_bubbles, k=k)
-
         ncc = nx.number_weakly_connected_components(db.nx_graph)
         logger.info(f'#cc = {ncc}')
         for cc in nx.weakly_connected_components(db.nx_graph):
