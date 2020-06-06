@@ -111,8 +111,6 @@ def filter_hybrid_alignments(hybrid_aligns, candidates,
 
     main_hybrids2pos, main_hybrids2info = {}, {}
     for pair, jumps in pair2jumps.items():
-        if len(jumps) == 1:
-            continue
         pair_hybrids_mult = {}
         all_pos = []
         for jump in jumps:
