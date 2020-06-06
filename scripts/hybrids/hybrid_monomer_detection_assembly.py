@@ -249,7 +249,8 @@ def main():
     logger.info('Reading SD reports')
     sd_report = SD_Report(sd_report_fn=params.sd,
                           monomers_fn=params.monomers,
-                          sequences_fn=params.assembly)
+                          sequences_fn=params.assembly,
+                          mode='assembly')
     logger.info('Finished reading SD reports')
 
     monomer_db = sd_report.monomer_db

@@ -45,8 +45,15 @@ class MonoStringSet:
             return monostrings
 
         def filter_monostrings(monostrings,
-                               max_lowercase=0.1,
-                               max_unreliable=0.4):
+                               max_lowercase=None,
+                               max_unreliable=None):
+            if max_lowercase is None or max_unreliable is None:
+                if mode == 'assembly':
+                    max_lowercase = 1
+                    max_unreliable = 1
+                else:
+                    max_lowercase = 0.1
+                    max_unreliable = 0.4
             good_monostrings, bad_monostrings = {}, {}
             for seq_id, ms in monostrings.items():
                 if ms.get_perc_lowercase() < max_lowercase and \
