@@ -9,7 +9,6 @@ import networkx as nx
 import numpy as np
 
 from sequence_graph.sequence_graph import SequenceGraph
-from utils.kmers import keep_shortest_lists
 from utils.nx_all_simple_paths_multigraph import all_simple_edge_paths
 
 
@@ -188,29 +187,33 @@ class DeBruijnGraph(SequenceGraph):
                 paths = all_simple_edge_paths(self.nx_graph, n1, n2,
                                               cutoff=cutoff)
                 paths = list(paths)
+                if n1 == 212 and n2 == 1346:
+                    print(paths)
                 if len(paths) > 1:
                     for path in paths:
                         path = tuple(path)
                         paths_set.add(path)
 
-        paths_set = keep_shortest_lists(paths_set)
-
         all_lens2paths = defaultdict(lambda: defaultdict(list))
         for path in paths_set:
             fst_edge, lst_edge = path[0], path[-1]
-            n1 = fst_edge[0]
-            n2 = lst_edge[1]
+            s = fst_edge[0]
+            e = lst_edge[1]
             string = self.get_path(path)
-            all_lens2paths[(n1, n2)][len(string)].append(path)
+            all_lens2paths[(s, e)][len(string)].append(path)
 
-        for n1, n2 in list(all_lens2paths):
+        # all_selected_paths = set()
+        for s, e in list(all_lens2paths):
             filt_lens2paths = \
-                {k: v for k, v in all_lens2paths[(n1, n2)].items()
-                 if len(v) > 1}
+                {k: v for k, v in all_lens2paths[(s, e)].items()
+                 if len(v) == 2}
             if len(filt_lens2paths):
-                all_lens2paths[(n1, n2)] = filt_lens2paths
+                all_lens2paths[(s, e)] = filt_lens2paths
+                # for path in filt_lens2paths.values():
+                #     path = tuple(path)
+                #     all_selected_paths.add(path)
             else:
-                del all_lens2paths[(n1, n2)]
+                del all_lens2paths[(s, e)]
 
         path2strCov = defaultdict(list)
         for (s, e), len2paths in all_lens2paths.items():
@@ -231,7 +234,7 @@ class DeBruijnGraph(SequenceGraph):
         bubbles = []
         for (s, e), ((str1, cov1), (str2, cov2)) in path2strCov.items():
             diff = [i for i, (a, b) in enumerate(zip(str1, str2)) if a != b]
-            print(s, e, len(diff))
+            print(s, e, len(diff), str1[diff[0]], str2[diff[0]])
             if len(diff) > max_diff:
                 continue
             if cov1 >= cov2:

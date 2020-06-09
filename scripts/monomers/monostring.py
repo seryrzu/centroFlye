@@ -8,8 +8,9 @@ import logging
 
 import numpy as np
 
-from utils.bio import RC
+from utils.bio import RC, calc_identity
 from utils.kmers import get_kmer_index_seq
+from utils.various import fst_iterable
 
 logger = logging.getLogger("centroFlye.monomers.monostring")
 
@@ -299,6 +300,34 @@ class MonoString:
             identities.append(mi.identity)
         return identities
 
+    # def correct_likely_hybrids(self, consensuses):
+    #     self.monomer_db.extend_db(consensuses) # TODO uncomment
+    #     for i, minst in enumerate(self.monoinstances):
+    #         # if not minst.is_reliable(): # TODO uncomment
+    #         if self[i] == '?': # TODO remove
+    #             continue
+    #         mind1 = minst.get_monoindex()
+    #         mind2 = minst.get_secmonoindex()
+    #         pair = min(mind1, mind2), max(mind1, mind2)
+    #         if pair not in consensuses:
+    #             continue
+    #         consensus = consensuses[pair]
+    #         if minst.is_lowercase():
+    #             consensus = RC(consensus)
+    #         segment = minst.nucl_segment
+    #         monomer1 = list(self.monomer_db.get_seqs_by_index(mind1))
+    #         monomer2 = list(self.monomer_db.get_seqs_by_index(mind2))
+    #         assert len(monomer1) == len(monomer2) == 1
+    #         monomer1 = fst_iterable(monomer1)
+    #         monomer2 = fst_iterable(monomer2)
+
+    #         ident2monomer1 = calc_identity(segment, monomer1)
+    #         ident2monomer2 = calc_identity(segment, monomer2)
+    #         ident2consensus = calc_identity(segment, consensus)
+    #         if ident2consensus > min(1, 1.05 * max(ident2monomer1, ident2monomer2)):
+    #             print(self.seq_id, i, ident2monomer1, ident2monomer2, ident2consensus)
+    #             mind = self.monomer_db.id2index[pair]
+    #             self[i] = mind
 
 def assert_monostring_validity(monostring):
     string = monostring.raw_monostring
