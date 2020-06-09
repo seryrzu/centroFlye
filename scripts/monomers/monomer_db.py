@@ -95,3 +95,17 @@ class MonomerDB:
     def get_monomers_dict(self):
         return {monomer.monomer_id: monomer.seq
                 for monomer in self.monomers}
+
+    def extend_db(self, extra_monomers):
+        index = max(self.index2id)
+        for monomer_id, seq in extra_monomers.items():
+            if monomer_id in self.id2index:
+                continue
+            index += 1
+            monomer = Monomer(monomer_id=monomer_id,
+                              mono_index=index,
+                              seq=seq)
+            self.id2index[monomer_id] = index
+            self.index2id[index].append(monomer_id)
+            self.monomers.append(monomer)
+            self.id2list_coord[monomer_id] = len(self.monomers) - 1
