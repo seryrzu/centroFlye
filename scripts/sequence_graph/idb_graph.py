@@ -33,7 +33,7 @@ def get_idb(string_set,
         get_frequent_kmers = def_get_frequent_kmers
 
     if all_kmer_index is None:
-        all_kmer_index = get_kmer_index(seqs=string_set.values(),
+        all_kmer_index = get_kmer_index(seqs=string_set,
                                         mink=mink, maxk=maxk,
                                         ignored_chars=ignored_chars)
     else:
