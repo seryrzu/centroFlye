@@ -80,8 +80,10 @@ def def_get_min_mult(k, mode):
     if k < 100:
         # not tested for k < 100
         return 20
-    elif 100 <= k <= 400:
+    elif 100 <= k <= 300:
         return 15
+    elif 300 < k <= 400:
+        return 10
     elif 400 < k:
         # path graph construction
         return 1
