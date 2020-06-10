@@ -4,12 +4,19 @@
 
 import logging
 
-from collections import defaultdict
+from collections import defaultdict, Counter
+import statistics
+import subprocess
+
+import edlib
 import networkx as nx
 import numpy as np
+import os
 
 from sequence_graph.sequence_graph import SequenceGraph
+from utils.bio import read_bio_seq, write_bio_seqs
 from utils.nx_all_simple_paths_multigraph import all_simple_edge_paths
+from utils.os_utils import smart_makedirs
 
 
 logger = logging.getLogger("centroFlye.sequence_graph.db_graph")
@@ -245,3 +252,256 @@ class DeBruijnGraph(SequenceGraph):
                 # self.nx_graph.remove_edge(s, e, 0)
         # self.collapse_nonbranching_paths()
         return bubbles
+
+
+def scaffolding(db, mappings, min_connections, long_edges):
+    def find_connections():
+        connections = defaultdict(lambda: defaultdict(int))
+        for r_id, mapping in mappings.items():
+            if mapping is None or not mapping.valid:
+                continue
+            path = mapping.epath
+            mapped_edges = set(path)
+            inters = mapped_edges & long_edges
+            if len(inters) > 1:
+                indexes = []
+                for long_edge in inters:
+                    index = path.index(long_edge)
+                    indexes.append(index)
+                indexes.sort()
+                for i, j in zip(indexes[:-1], indexes[1:]):
+                    long_edge_pair = (path[i], path[j])
+                    connection = tuple(path[i:j+1])
+                    connections[long_edge_pair][connection] += 1
+        for ee, ee_connections in connections.items():
+            print(ee)
+            for connection, val in ee_connections.items():
+                print(connection, val)
+            print("\n")
+        return connections
+
+    def build_scaffold_graph(connections):
+        scaffold_graph = nx.DiGraph()
+        for long_edge in long_edges:
+            scaffold_graph.add_node(long_edge)
+
+        for (e1, e2), connection_counts in connections.items():
+            n_support_connections = sum(connection_counts.values())
+            if n_support_connections >= min_connections:
+                scaffold_graph.add_edge(e1, e2,
+                                        connections=connection_counts)
+        return scaffold_graph
+
+    def select_lists(scaffold_graph):
+        longedge_scaffolds = []
+        for cc in nx.weakly_connected_components(scaffold_graph):
+            cc_sg = scaffold_graph.subgraph(cc)
+            if nx.is_directed_acyclic_graph(cc_sg):
+                longest_path = nx.dag_longest_path(cc_sg)
+                longedge_scaffolds.append(longest_path)
+        return longedge_scaffolds
+
+    def get_longest_extensions(longedge_scaffold):
+        left_edge = longedge_scaffold[0]
+        right_edge = longedge_scaffold[-1]
+        lst_left_ext = []
+        lst_right_ext = []
+        for r_id, mapping in mappings.items():
+            if mapping is None or not mapping.valid:
+                continue
+            path = mapping.epath
+            try:
+                left_index = path.index(left_edge)
+                left_ext = path[:left_index]
+                if len(left_ext) > len(lst_left_ext):
+                    lst_left_ext = left_ext
+            except ValueError:
+                pass
+            try:
+                right_index = path.index(right_edge)
+                right_ext = path[right_index+1:]
+                if len(right_ext) > len(lst_right_ext):
+                    lst_right_ext = right_ext
+            except ValueError:
+                pass
+        return lst_left_ext, lst_right_ext
+
+    def get_edge_scaffolds(longedge_scaffolds, connections):
+        edge_scaffolds = []
+        for longedge_scaffold in longedge_scaffolds:
+            edge_scaffold = [longedge_scaffold[0]]
+            for e1, e2 in zip(longedge_scaffold[:-1],
+                              longedge_scaffold[1:]):
+                # print(e1, e2)
+                edge_connect = connections[(e1, e2)]
+                path = max(edge_connect, key=edge_connect.get)
+                edge_scaffold += path[1:]
+            left_ext, right_ext = get_longest_extensions(longedge_scaffold)
+            edge_scaffold = left_ext + edge_scaffold + right_ext
+            edge_scaffolds.append(edge_scaffold)
+        return edge_scaffolds
+
+    def get_sequence_scaffolds(edge_scaffolds):
+        scaffolds = []
+        for edge_scaffold in edge_scaffolds:
+            scaffold = db.get_path(edge_scaffold)
+            scaffolds.append(scaffold)
+        return scaffolds
+
+    long_edges = set(long_edges)
+    connections = find_connections()
+    scaffold_graph = build_scaffold_graph(connections)
+    longedge_scaffolds = select_lists(scaffold_graph)
+
+    edge_scaffolds = get_edge_scaffolds(longedge_scaffolds,
+                                        connections)
+
+    scaffolds = get_sequence_scaffolds(edge_scaffolds)
+    return scaffolds, edge_scaffolds
+
+
+def map_monoreads2scaffolds(monoreads, scaffolds, max_nloc=2):
+    def map_monoread2scaffold(monoread, scaffold):
+        size = monoread.monomer_db.get_size()
+        add_matches = [(monoread.gap_symb, i) for i in range(size)]
+        align = edlib.align(monoread,
+                            scaffold,
+                            mode='HW',
+                            task='locations',
+                            k=0,
+                            additionalEqualities=add_matches)
+        locs = align['locations']
+        # if s_id == 'b988001c-6155-4fa8-8300-2ec01c12eeb1':
+        #     align = edlib.align(monoread,
+        #                         scaffold,
+        #                         mode='HW',
+        #                         task='locations',
+        #                         k=10,
+        #                         additionalEqualities=add_matches)
+        #     locs = align['locations']
+        #     print(locs)
+        #     for st, en in locs:
+        #         diff = [(a, b) for a, b in zip(monoread, scaffold[st:en+1])
+        #                 if a != b and a != '?']
+        #         print(diff)
+        return locs
+
+    all_locations = {}
+    for i, scaffold in enumerate(scaffolds):
+        all_locations[i] = {}
+        for s_id, monoread in monoreads.items():
+            locs = map_monoread2scaffold(monoread, scaffold)
+            if 0 < len(locs) <= max_nloc:
+                all_locations[i][s_id] = locs
+    return all_locations
+
+
+def cover_scaffolds_w_reads(locations, monoreads, scaffolds):
+    all_coverages = []
+    for s_i, scaffold in enumerate(scaffolds):
+        coverage = [{} for i in range(len(scaffold) + 1)]
+        for s_id, read_locs in locations[s_i].items():
+            for st, en in read_locs:
+                monoread = monoreads[s_id]
+                assert en - st + 1 == len(monoread)
+                for i, minst in enumerate(monoread.monoinstances):
+                    p = st + i
+                    coverage[p][minst.seq_id] = minst
+        all_coverages.append(coverage)
+    return all_coverages
+
+
+def partition_pseudounits(monostring):
+    pseudounits = []
+    i = 0
+    while i < len(monostring):
+        j = 0
+        monomer_cnt = Counter()
+        while i+j < len(monostring):
+            monomer = monostring[i+j]
+            monomer_cnt[monomer] += 1
+            if monomer_cnt[monomer] > 1:
+                break
+            j += 1
+        pseudounit = (i, i + j - 1)
+        pseudounits.append(pseudounit)
+        i += j
+    return pseudounits
+
+
+def extract_read_pseudounits(covered_scaffolds, scaffolds,
+                             monostrings, min_coverage=0):
+    all_read_pseudounits = []
+    for s_i, scaffold in enumerate(scaffolds):
+        scaf_pseudounits = partition_pseudounits(scaffold)
+        covered_scaffold = covered_scaffolds[s_i]
+        read_pseudounits = []
+        for s, e in scaf_pseudounits:
+            s_monomers = covered_scaffold[s]
+            e_monomers = covered_scaffold[e]
+            r_ids = set(s_monomers) & set(e_monomers)
+            segms = {}
+            for r_id in r_ids:
+                st = s_monomers[r_id].st
+                en = e_monomers[r_id].en
+                segm = monostrings[r_id].nucl_sequence[st:en]
+                segms[(r_id, st, en)] = segm
+            read_pseudounits.append(segms)
+        all_read_pseudounits.append(read_pseudounits)
+    return all_read_pseudounits
+
+
+def polish(scaffolds, read_pseudounits, outdir,
+           n_iter=2, n_threads=30, flye_bin='flye'):
+    smart_makedirs(outdir)
+    for i, scaffold in enumerate(scaffolds):
+
+        scaf_outdir = os.path.join(outdir, f'scaffold_{i}')
+        smart_makedirs(scaf_outdir)
+
+        polished_scaffold = []
+        for j, pseudounits in enumerate(read_pseudounits[i]):
+            print(j, len(read_pseudounits[i]))
+            pseudounit_outdir = os.path.join(scaf_outdir, f'pseudounit_{j}')
+            smart_makedirs(pseudounit_outdir)
+
+            if len(pseudounits) == 0:
+                continue
+
+            reads_fn = os.path.join(pseudounit_outdir, 'reads.fasta')
+            write_bio_seqs(reads_fn, pseudounits)
+
+            template_fn = os.path.join(pseudounit_outdir, 'template.fasta')
+            template_id, template_read = "", None
+            r_units_lens = [len(read) for read in pseudounits.values()]
+            med_len = statistics.median_high(r_units_lens)
+            for r_id in sorted(pseudounits):
+                read = pseudounits[r_id]
+                if len(read) == med_len:
+                    template_id = r_id
+                    template_read = read
+                    break
+            assert len(pseudounits[template_id]) == med_len
+            assert len(template_read) == med_len
+            write_bio_seqs(template_fn,
+                           {template_id: template_read})
+
+            cmd = [flye_bin,
+                   '--nano-raw', reads_fn,
+                   '--polish-target', template_fn,
+                   '-i', n_iter,
+                   '-t', n_threads,
+                   '-o', pseudounit_outdir]
+            cmd = [str(x) for x in cmd]
+            print(' '.join(cmd))
+            subprocess.check_call(cmd)
+
+            polished_pseudounit_fn = \
+                os.path.join(pseudounit_outdir, f'polished_{n_iter}.fasta')
+            polished_pseudounit = read_bio_seq(polished_pseudounit_fn)
+            polished_scaffold.append(polished_pseudounit)
+
+        polished_scaffold = ''.join(polished_scaffold)
+        polished_scaffold_fn = os.path.join(scaf_outdir, f'scaffold_{i}.fasta')
+        write_bio_seqs(polished_scaffold_fn,
+                       {f'scaffold_{i}_niter_{n_iter}': polished_scaffold})
