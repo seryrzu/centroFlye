@@ -9,14 +9,17 @@ import statistics
 import subprocess
 
 import edlib
+from joblib import Parallel, delayed
 import networkx as nx
 import numpy as np
 import os
+from tqdm import tqdm
 
 from sequence_graph.sequence_graph import SequenceGraph
-from utils.bio import read_bio_seq, write_bio_seqs
+from utils.bio import read_bio_seq, write_bio_seqs, parse_cigar
 from utils.nx_all_simple_paths_multigraph import all_simple_edge_paths
 from utils.os_utils import smart_makedirs
+from utils.various import fst_iterable
 
 
 logger = logging.getLogger("centroFlye.sequence_graph.db_graph")
@@ -360,18 +363,33 @@ def scaffolding(db, mappings, min_connections, long_edges):
     return scaffolds, edge_scaffolds
 
 
-def map_monoreads2scaffolds(monoreads, scaffolds, max_nloc=2):
+def map_monoreads2scaffolds(monoreads, scaffolds, max_nloc=1):
     def map_monoread2scaffold(monoread, scaffold):
         size = monoread.monomer_db.get_size()
         add_matches = [(monoread.gap_symb, i) for i in range(size)]
         align = edlib.align(monoread,
                             scaffold,
                             mode='HW',
-                            task='locations',
+                            task='path',
                             k=0,
                             additionalEqualities=add_matches)
         locs = align['locations']
-        # if s_id == 'b988001c-6155-4fa8-8300-2ec01c12eeb1':
+        if len(locs) == 2 and locs[0][1] >= 11924 and locs[1][0] <= 14393:
+            # f_s, f_e = locs[0]
+            # s_s, s_e = locs[1]
+            # f_s = monoassembly.monoinstances[f_s].st
+            # f_e = monoassembly.monoinstances[f_e].en
+            # s_s = monoassembly.monoinstances[s_s].st
+            # s_e = monoassembly.monoinstances[s_e].en
+            # r_s = monoread.monoinstances[0].st
+            # r_e = monoread.monoinstances[-1].en
+            # strand = '+' if not monoread.is_reversed else '-'
+            print(s_id, locs)
+            # cigar, cnt, a1, a2 = parse_cigar(align['cigar'], monoread, scaffold[locs[0][0]:locs[0][1]+1])
+            # for c1, c2 in zip(a1, a2):
+            #     print(c1, c2)
+
+
         #     align = edlib.align(monoread,
         #                         scaffold,
         #                         mode='HW',
@@ -445,61 +463,74 @@ def extract_read_pseudounits(covered_scaffolds, scaffolds,
                 st = s_monomers[r_id].st
                 en = e_monomers[r_id].en
                 segm = monostrings[r_id].nucl_sequence[st:en]
-                segms[(r_id, st, en)] = segm
-            read_pseudounits.append(segms)
+                segms[f'{r_id}|{st}|{en}'] = segm
+            read_pseudounits.append((s, e, segms))
         all_read_pseudounits.append(read_pseudounits)
     return all_read_pseudounits
 
 
-def polish(scaffolds, read_pseudounits, outdir,
+def polish(scaffolds, read_pseudounits, outdir, monomer_db,
            n_iter=2, n_threads=30, flye_bin='flye'):
+
+    def get_template(raw_monostring, monomer_db):
+        print(raw_monostring)
+        template = [fst_iterable(monomer_db.get_seqs_by_index(mono_index))
+                    for mono_index in raw_monostring]
+        return ''.join(template)
+
     smart_makedirs(outdir)
     for i, scaffold in enumerate(scaffolds):
 
         scaf_outdir = os.path.join(outdir, f'scaffold_{i}')
         smart_makedirs(scaf_outdir)
 
-        polished_scaffold = []
-        for j, pseudounits in enumerate(read_pseudounits[i]):
+        cmds = []
+        for j, (s, e, pseudounits) in enumerate(read_pseudounits[i]):
             print(j, len(read_pseudounits[i]))
             pseudounit_outdir = os.path.join(scaf_outdir, f'pseudounit_{j}')
             smart_makedirs(pseudounit_outdir)
-
-            if len(pseudounits) == 0:
-                continue
 
             reads_fn = os.path.join(pseudounit_outdir, 'reads.fasta')
             write_bio_seqs(reads_fn, pseudounits)
 
             template_fn = os.path.join(pseudounit_outdir, 'template.fasta')
-            template_id, template_read = "", None
-            r_units_lens = [len(read) for read in pseudounits.values()]
-            med_len = statistics.median_high(r_units_lens)
-            for r_id in sorted(pseudounits):
-                read = pseudounits[r_id]
-                if len(read) == med_len:
-                    template_id = r_id
-                    template_read = read
-                    break
-            assert len(pseudounits[template_id]) == med_len
-            assert len(template_read) == med_len
+            # template_id, template_read = "", None
+            # r_units_lens = [len(read) for read in pseudounits.values()]
+            # med_len = statistics.median_high(r_units_lens)
+            # for r_id in sorted(pseudounits):
+            #     read = pseudounits[r_id]
+            #     if len(read) == med_len:
+            #         template_id = r_id
+            #         template_read = read
+            #         break
+            # assert len(pseudounits[template_id]) == med_len
+            # assert len(template_read) == med_len
+            template = get_template(scaffold[s:e+1], monomer_db)
+            template_id = f'{s}|{e}|'
+            template_id += '_'.join([str(m) for m in scaffold[s:e+1]])
             write_bio_seqs(template_fn,
-                           {template_id: template_read})
+                           {template_id: template})
 
             cmd = [flye_bin,
                    '--nano-raw', reads_fn,
                    '--polish-target', template_fn,
                    '-i', n_iter,
-                   '-t', n_threads,
+                   '-t', 1,
                    '-o', pseudounit_outdir]
             cmd = [str(x) for x in cmd]
             print(' '.join(cmd))
-            subprocess.check_call(cmd)
-
+            # subprocess.check_call(cmd)
+            cmds.append(cmd)
+        Parallel(n_jobs=n_threads)(delayed(subprocess.check_call)(cmd)
+                                 for cmd in tqdm(cmds))
+        polished_scaffold = []
+        for j, (s, e, pseudounits) in enumerate(read_pseudounits[i]):
+            pseudounit_outdir = os.path.join(scaf_outdir, f'pseudounit_{j}')
             polished_pseudounit_fn = \
                 os.path.join(pseudounit_outdir, f'polished_{n_iter}.fasta')
-            polished_pseudounit = read_bio_seq(polished_pseudounit_fn)
-            polished_scaffold.append(polished_pseudounit)
+            if os.path.isfile(polished_pseudounit_fn):
+                polished_pseudounit = read_bio_seq(polished_pseudounit_fn)
+                polished_scaffold.append(polished_pseudounit)
 
         polished_scaffold = ''.join(polished_scaffold)
         polished_scaffold_fn = os.path.join(scaf_outdir, f'scaffold_{i}.fasta')
