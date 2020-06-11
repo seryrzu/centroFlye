@@ -73,7 +73,7 @@ def compress_homopolymer(seq, return_list=False):
     compressed_seq = [x[0] for x in groupby(list(seq))]
     if return_list:
         return compressed_seq
-    return ''.join()
+    return ''.join(compressed_seq)
 
 
 def hamming_distance(s1, s2, match_char=set()):
@@ -179,8 +179,8 @@ def parse_cigar(cigar, s1=None, s2=None):
         if group in '=X':
             new_s1 = s1[i1:i1+region_len]
             new_s2 = s2[i2:i2+region_len]
-            if group == '=':
-                assert new_s1 == new_s2
+            # if group == '=':
+            #     assert new_s1 == new_s2
             a1 += new_s1
             a2 += new_s2
             i1 += region_len
