@@ -45,8 +45,9 @@ def parse_args():
     parser.add_argument("--left-certain-border", type=int, default=11000)
     parser.add_argument("--right-certain-border", type=int, default=13000)
     parser.add_argument("--min-mult", type=int, default=3)
-    parser.add_argument("--nrepeat", type=int, default=8)
+    parser.add_argument("--nrepeat", type=int, default=10)
     parser.add_argument("--k", type=int, default=19)
+    parser.add_argument("--cloud-contig-minfreq", type=int, default=3)
     params = parser.parse_args()
     return params
 
@@ -121,6 +122,7 @@ class CloudContig:
         self.kmer_positions = defaultdict(int)
         self.read_positions = {}
         self.coverage = defaultdict(int)
+        # self.prohibited_kmers = set()
 
     def update_max_pos(self):
         if len(self.clouds):
@@ -135,9 +137,20 @@ class CloudContig:
             self.coverage[i + position] += 1
             self.clouds[i + position]
             for kmer in cloud:
+                # if kmer in self.prohibited_kmers:
+                #     continue
                 if kmer in self.kmer_positions and \
                         self.kmer_positions[kmer] != i+position:
                     continue
+                    # if kmer in self.freq_kmers:
+                    #     continue
+                    # else:
+                    #     self.prohibited_kmers.add(kmer)
+                    #     pos = self.kmer_positions[kmer]
+                    #     del self.clouds[pos][kmer]
+                    #     del self.kmer_positions[kmer]
+                    #     continue
+
                 self.kmer_positions[kmer] = i+position
                 self.clouds[i+position][kmer] += 1
                 if self.clouds[i+position][kmer] == self.min_cloud_kmer_freq:
@@ -188,8 +201,8 @@ class CloudContig:
 
 
 def var_assess_quality(variant, q_ids, certain_rids, all_read_kmer_clouds,
-                       locations):
-    cloud_contig = CloudContig(3)
+                       locations, cloud_contig_minfreq):
+    cloud_contig = CloudContig(cloud_contig_minfreq)
     for r_id in certain_rids:
         cloud_contig.add_read(all_read_kmer_clouds[r_id],
                               position=locations[r_id][0][0])
@@ -206,18 +219,20 @@ def get_best_variant(nrepeat,
                      certain_rids,
                      all_read_kmer_clouds,
                      locations,
+                     cloud_contig_minfreq,
+                     logger,
                      n_threads=1):
     best_variant, best_score = None, 0
     variants = list(product([0, 1], repeat=nrepeat))
     scores = Parallel(
         n_jobs=n_threads, backend="threading")(
         delayed(var_assess_quality)
-        (variant, q_ids, certain_rids, all_read_kmer_clouds, locations)
+        (variant, q_ids, certain_rids, all_read_kmer_clouds, locations,
+         cloud_contig_minfreq)
         for variant in tqdm(variants))
 
-    print(scores)
+    logger.info(f'Scores {scores}')
     amax = np.argmax(scores)
-    print(scores[amax], variants[amax])
     return variants[amax]
 
 
@@ -252,7 +267,7 @@ def main():
     with open(params.monoscaffold) as f:
         raw_monoassembly = [int(x) if x.isdigit() else x
                             for x in f.readline().strip().split(' ')]
-    logger.info(f'Finishd Getting raw monoassembly')
+    logger.info(f'Finished getting raw monoassembly')
 
     logger.info(f'Mapping reads')
     locations = map_monoreads2scaffolds(monoreads,
@@ -291,7 +306,9 @@ def main():
                                     q_ids=q_ids,
                                     certain_rids=certain_rids,
                                     all_read_kmer_clouds=all_read_kmer_clouds,
-                                    locations=locations)
+                                    locations=locations,
+                                    cloud_contig_minfreq=params.cloud_contig_minfreq,
+                                    logger=logger)
     logger.info(f'Best variant {best_variant}')
     for v, q_id in zip(best_variant, q_ids):
         logger.info(f'{q_id} {v}')
