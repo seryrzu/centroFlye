@@ -374,7 +374,7 @@ def map_monoreads2scaffolds(monoreads, scaffolds, max_nloc=1):
                             k=0,
                             additionalEqualities=add_matches)
         locs = align['locations']
-        if len(locs) == 2 and locs[0][1] >= 11924 and locs[1][0] <= 14393:
+        # if len(locs) == 2 and locs[0][1] >= 11924 and locs[1][0] <= 14393:
             # f_s, f_e = locs[0]
             # s_s, s_e = locs[1]
             # f_s = monoassembly.monoinstances[f_s].st
@@ -384,7 +384,7 @@ def map_monoreads2scaffolds(monoreads, scaffolds, max_nloc=1):
             # r_s = monoread.monoinstances[0].st
             # r_e = monoread.monoinstances[-1].en
             # strand = '+' if not monoread.is_reversed else '-'
-            print(s_id, locs)
+            # print(s_id, locs)
             # cigar, cnt, a1, a2 = parse_cigar(align['cigar'], monoread, scaffold[locs[0][0]:locs[0][1]+1])
             # for c1, c2 in zip(a1, a2):
             #     print(c1, c2)
@@ -421,7 +421,8 @@ def cover_scaffolds_w_reads(locations, monoreads, scaffolds):
         for s_id, read_locs in locations[s_i].items():
             for st, en in read_locs:
                 monoread = monoreads[s_id]
-                assert en - st + 1 == len(monoread)
+                if en - st + 1 != len(monoread):
+                    continue
                 for i, minst in enumerate(monoread.monoinstances):
                     p = st + i
                     coverage[p][minst.seq_id] = minst
