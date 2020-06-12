@@ -457,8 +457,8 @@ def hybrid_alignment(r, a, b, mism=-1, match=1, indel=-1):
     return alr, alm, score, sec_score, jump, orient
 
 
-def calc_identity(a, b): # global alignment identity
-    alignment = edlib.align(a, b, task='path')
+def calc_identity(a, b, mode='NW'):
+    alignment = edlib.align(a, b, task='path', mode=mode)
     cigar, cigar_stats = parse_cigar(alignment['cigar'])
     alignment_len = sum(cigar_stats.values())
     identity = 1 - alignment['editDistance'] / alignment_len
