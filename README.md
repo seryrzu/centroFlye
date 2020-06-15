@@ -19,11 +19,11 @@ The comparison of various cenX assemblies can be found in Bzikadze et al., 2020 
 + Python 3.6
 
 ### Python packages:
-+ [Biopython](https://pypi.org/project/biopython/)
-+ [Edlib](https://pypi.org/project/edlib/)
-+ [Networkx](https://pypi.org/project/networkx/)
-+ [Numpy](https://pypi.org/project/numpy/)
-+ [Regex](https://pypi.org/project/regex/)
++ [Biopython](https://pypi.org/project/biopython/) (tested on version 1.70)
++ [Edlib](https://pypi.org/project/edlib/) (tested on version 1.2.3)
++ [Networkx](https://pypi.org/project/networkx/) (tested on version 2.2)
++ [Numpy](https://pypi.org/project/numpy/) (tested on version 1.16.1)
++ [Regex](https://pypi.org/project/regex/) (tested on version 2.4.104)
 
 ### External software
 + [Flye](https://github.com/fenderglass/Flye) (*v2.5*, tested on commit: `315122d2ff58025aa4c38227239f431490b557ac`)
