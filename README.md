@@ -7,10 +7,10 @@ For convenience that repository includes current branch of the main centroFlye r
 
 ### Version 0.8.3 cenX + 0.1.3 cen6
 ## Overview
-centroFlye (Bzikadze et al., 2019) is an algorithm for centromere assembly using long error-prone reads.
+centroFlye (Bzikadze et al., 2020) is an algorithm for centromere assembly using long error-prone reads.
 Currently it supports assembly of a human centromere 6 (referred to as cen6) and X (referred to as cenX).
 Here we show how to apply it for the cen6 and cenX of the CHM13hTERT human cell line.
-The comparison of various cenX assemblies can be found in Bzikadze et al., 2019 and Mikheenko et al., 2019.
+The comparison of various cenX assemblies can be found in Bzikadze et al., 2020 and Mikheenko et al., 2020.
 
 
 ## Dependencies
@@ -32,7 +32,7 @@ The comparison of various cenX assemblies can be found in Bzikadze et al., 2019 
 Please note that all external software by default has to be in your `PATH`.
 
 ### Data
-+ `<path_to_CHM13>` — path where the T2T ONT reads are located (rel2, Guppy flip-flop 2.3.1, used for cenX assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel2/rel2.fastq.gz); rel3, Guppy flip-flop 3.1.5, is used for cen6 assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel3/rel3.fastq.gz) ; also see [github](https://github.com/nanopore-wgs-consortium/CHM13)). The data is described in Miga, Koren et al., 2019.
++ `<path_to_CHM13>` — path where the T2T ONT reads are located (rel2, Guppy flip-flop 2.3.1, used for cenX assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel2/rel2.fastq.gz); rel3, Guppy flip-flop 3.1.5, is used for cen6 assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel3/rel3.fastq.gz) ; also see [github](https://github.com/nanopore-wgs-consortium/CHM13)). The data is described in Miga, Koren et al., 2020.
 
 ## Availability
 Final assembly and all intermediate results of the pipeline described below are published at [ZENODO](https://doi.org/10.5281/zenodo.3369553)
@@ -156,7 +156,7 @@ bash scripts/read_recruitment/run_read_recruitment.sh \
 
 ### 2. Running String Decomposer on cen6 reads
 
-We use String Decomposer (SD; Dvorkina et al., 2019) to partition cen6 reads into distinct monomers of D6Z1.
+We use String Decomposer (SD; Dvorkina et al., 2020) to partition cen6 reads into distinct monomers of D6Z1.
 These monomers are supplied in the current repo at ``supplementary_data/D6Z1_monomers.fasta``.
 The result of this step is the report of SD is stored at `results_cen6/string_decomposer_report`
 
