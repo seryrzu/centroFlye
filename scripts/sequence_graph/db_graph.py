@@ -471,7 +471,7 @@ def extract_read_pseudounits(covered_scaffolds, scaffolds,
 
 
 def polish(scaffolds, read_pseudounits, outdir, monomer_db,
-           n_iter=4, n_threads=30, flye_bin='flye'):
+           n_iter=4, n_threads=30, min_cov=3, flye_bin='flye'):
 
     def get_template(raw_monostring, monomer_db):
         print(raw_monostring)
@@ -488,6 +488,9 @@ def polish(scaffolds, read_pseudounits, outdir, monomer_db,
         cmds = []
         for j, (s, e, pseudounits) in enumerate(read_pseudounits[i]):
             print(j, len(read_pseudounits[i]))
+            if len(pseudounits) == 0:
+                continue
+
             pseudounit_outdir = os.path.join(scaf_outdir, f'pseudounit_{j}')
             smart_makedirs(pseudounit_outdir)
 
@@ -495,33 +498,40 @@ def polish(scaffolds, read_pseudounits, outdir, monomer_db,
             write_bio_seqs(reads_fn, pseudounits)
 
             template_fn = os.path.join(pseudounit_outdir, 'template.fasta')
-            # template_id, template_read = "", None
-            # r_units_lens = [len(read) for read in pseudounits.values()]
-            # med_len = statistics.median_high(r_units_lens)
-            # for r_id in sorted(pseudounits):
-            #     read = pseudounits[r_id]
-            #     if len(read) == med_len:
-            #         template_id = r_id
-            #         template_read = read
-            #         break
-            # assert len(pseudounits[template_id]) == med_len
-            # assert len(template_read) == med_len
-            template = get_template(scaffold[s:e+1], monomer_db)
-            template_id = f'{s}|{e}|'
-            template_id += '_'.join([str(m) for m in scaffold[s:e+1]])
+            template_id, template = "", None
+            r_units_lens = [len(read) for read in pseudounits.values()]
+            med_len = statistics.median_high(r_units_lens)
+            for r_id in sorted(pseudounits):
+                read = pseudounits[r_id]
+                if len(read) == med_len:
+                    template_id = r_id
+                    template = read
+                    break
+            assert len(pseudounits[template_id]) == med_len
+            assert len(template) == med_len
+
+            # template = get_template(scaffold[s:e+1], monomer_db)
+            # template_id = f'{s}|{e}|'
+            # template_id += '_'.join([str(m) for m in scaffold[s:e+1]])
             write_bio_seqs(template_fn,
                            {template_id: template})
-
-            cmd = [flye_bin,
-                   '--nano-raw', reads_fn,
-                   '--polish-target', template_fn,
-                   '-i', n_iter,
-                   '-t', 1,
-                   '-o', pseudounit_outdir]
-            cmd = [str(x) for x in cmd]
-            print(' '.join(cmd))
-            # subprocess.check_call(cmd)
-            cmds.append(cmd)
+            if len(pseudounits) <= min_cov:
+                print(f'Unit {j} will not be polished, using {template_id}')
+                polished_pseudounit_fn = \
+                    os.path.join(pseudounit_outdir, f'polished_{n_iter}.fasta')
+                write_bio_seqs(polished_pseudounit_fn,
+                               {template_id: template})
+            else:
+                cmd = [flye_bin,
+                    '--nano-raw', reads_fn,
+                    '--polish-target', template_fn,
+                    '-i', n_iter,
+                    '-t', 1,
+                    '-o', pseudounit_outdir]
+                cmd = [str(x) for x in cmd]
+                print(' '.join(cmd))
+                # subprocess.check_call(cmd)
+                cmds.append(cmd)
         Parallel(n_jobs=n_threads)(delayed(subprocess.check_call)(cmd)
                                  for cmd in tqdm(cmds))
         polished_scaffold = []
