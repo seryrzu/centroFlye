@@ -1,5 +1,10 @@
 # centroFlye
 
+**Disclaimer:** The following description is aimed for reconstruction of assemblies presented in the Nature Biotechnology paper (see `Publications`).
+The latest stable assemblies are produced by a more recent version of centroFlye that can be found in `master` branch.
+[This](https://github.com/seryrzu/centroFlye_paper_scripts) github repository provides all supporting jupyter notebooks that are neccessary to replicate the results in the paper.
+For convenience that repository includes current branch of the main centroFlye repository as a submodule.
+
 ### Version 0.8.3 cenX + 0.1.3 cen6
 ## Overview
 centroFlye (Bzikadze et al., 2019) is an algorithm for centromere assembly using long error-prone reads.
@@ -13,7 +18,7 @@ The comparison of various cenX assemblies can be found in Bzikadze et al., 2019 
 + C++ 14
 + Python 3.6
 
-### Python packages (preferably latest versions):
+### Python packages:
 + [Biopython](https://pypi.org/project/biopython/)
 + [Edlib](https://pypi.org/project/edlib/)
 + [Networkx](https://pypi.org/project/networkx/)
@@ -188,10 +193,10 @@ python scripts/centroFlyeMono.py \
 
 
 ## Publications
-- Bzikadze A.V., Pevzner P.A. centroFlye: Assembling Centromeres with Long Error-Prone Reads, 2019, *bioRxiv*
-- Dvorkina T., Bzikadze A.V., Pevzner P.A. The String Decomposition Problem and its Applications to Centromere Assembly, 2019, *bioRxiv*
-- Miga, K.H., Koren, S., Rhie, A., Vollger, M.R., Gershman, A., Bzikadze, A., Brooks, S., Howe, E., Porubsky, D., Logsdon, G.A., et al. (2019). Telomere-to-telomere assembly of a complete human X chromosome. *bioRxiv*.
-- Mikheenko, A., Bzikadze, A.V., Gurevich, A., Miga, K.H., and Pevzner, P.A. (2019). TandemMapper and TandemQUAST: mapping long reads and assessing/improving assembly quality in extra-long tandem repeats. *bioRxiv*
+- Bzikadze A.V., Pevzner P.A. centroFlye: Assembling Centromeres with Long Error-Prone Reads, *Nature Biotechnology, in press*, 2020
+- Dvorkina T., Bzikadze A.V., Pevzner P.A. The String Decomposition Problem and its Applications to Centromere Assembly, *Bioinformatics, in press*, 2020
+- Miga, K.H., Koren, S., Rhie, A., Vollger, M.R., Gershman, A., Bzikadze, A., Brooks, S., Howe, E., Porubsky, D., Logsdon, G.A., et al. Telomere-to-telomere assembly of a complete human X chromosome, *Nature, in press*, 2020
+- Mikheenko, A., Bzikadze, A.V., Gurevich, A., Miga, K.H., and Pevzner, P.A. TandemMapper and TandemQUAST: mapping long reads and assessing/improving assembly quality in extra-long tandem repeats, *Bioinformatics, in press*, 2020
 
 
 ## Contacts
