@@ -244,6 +244,8 @@ def main():
         locations[q_id] = [locations[q_id][best_variant[i]]]
         logger.info(f'{q_id} {locations[q_id]}')
 
+    locations = {r_id: loc for r_id, loc in locations.items()
+                 if len(loc) == 1}
     locations = [locations]
     covered_scaffolds = cover_scaffolds_w_reads(locations,
                                                 monoreads,
