@@ -17,6 +17,7 @@ import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
+from cloud_contig import CloudContig
 from read_kmer_cloud import filter_reads_kmer_clouds
 from sd_parser.sd_parser import SD_Report
 from sequence_graph.db_graph import map_monoreads2scaffolds, \
@@ -45,9 +46,9 @@ def parse_args():
     parser.add_argument("--left-certain-border", type=int, default=11000)
     parser.add_argument("--right-certain-border", type=int, default=13000)
     parser.add_argument("--min-mult", type=int, default=3)
-    parser.add_argument("--nrepeat", type=int, default=10)
+    parser.add_argument("--nrepeat", type=int, default=12)
     parser.add_argument("--k", type=int, default=19)
-    parser.add_argument("--cloud-contig-minfreq", type=int, default=3)
+    parser.add_argument("--cloud-contig-minfreq", type=int, default=4)
     params = parser.parse_args()
     return params
 
@@ -85,7 +86,7 @@ class ReadKMerCloud:
             self.all_kmers += v
 
     @classmethod
-    def from_monoread(cls, monoread, k, max_mult=3):
+    def from_monoread(cls, monoread, k, max_mult=2):
         all_kmers = []
         all_kmer_cnt = Counter()
         for minst in monoread.monoinstances:
@@ -111,107 +112,32 @@ def monostrings2kmerclouds(monoreads, k):
     return kmer_clouds
 
 
-class CloudContig:
-    def __init__(self, min_cloud_kmer_freq):
-        self.max_pos = 0
-        self.min_cloud_kmer_freq = max(1, min_cloud_kmer_freq)
-
-        self.clouds = defaultdict(Counter)
-        self.freq_clouds = defaultdict(set)
-        self.freq_kmers = set()
-        self.kmer_positions = defaultdict(int)
-        self.read_positions = {}
-        self.coverage = defaultdict(int)
-        # self.prohibited_kmers = set()
-
-    def update_max_pos(self):
-        if len(self.clouds):
-            self.max_pos = max(self.clouds.keys())
-        else:
-            self.max_pos = 0
-
-    def add_read(self, read_kmer_clouds, position):
-        self.read_positions[read_kmer_clouds.r_id] = position
-        new_freq_kmers = []
-        for i, cloud in enumerate(read_kmer_clouds.kmers):
-            self.coverage[i + position] += 1
-            self.clouds[i + position]
-            for kmer in cloud:
-                # if kmer in self.prohibited_kmers:
-                #     continue
-                if kmer in self.kmer_positions and \
-                        self.kmer_positions[kmer] != i+position:
-                    continue
-                    # if kmer in self.freq_kmers:
-                    #     continue
-                    # else:
-                    #     self.prohibited_kmers.add(kmer)
-                    #     pos = self.kmer_positions[kmer]
-                    #     del self.clouds[pos][kmer]
-                    #     del self.kmer_positions[kmer]
-                    #     continue
-
-                self.kmer_positions[kmer] = i+position
-                self.clouds[i+position][kmer] += 1
-                if self.clouds[i+position][kmer] == self.min_cloud_kmer_freq:
-                    self.freq_clouds[i+position].add(kmer)
-                    self.freq_kmers.add(kmer)
-                    new_freq_kmers.append((kmer, i+position))
-        self.update_max_pos()
-        assert len(set(new_freq_kmers)) == len(new_freq_kmers)
-        return new_freq_kmers
-
-    def calc_rough_inters_score(self, read_kmer_cloud):
-        return len(read_kmer_cloud.all_kmers & self.freq_kmers)
-
-    def calc_inters_score(self, read_kmer_cloud,
-                          min_position=0, max_position=None,
-                          min_unit=2, min_inters=5,
-                          verbose=False):
-        if max_position is None:
-            max_position = self.max_pos
-        best_score, best_pos = (0, 0), None
-        kmers = read_kmer_cloud.kmers
-        positions = [pos for pos in range(min_position, max_position + 1)]
-        for pos in positions:
-            score = [0, 0]
-            max_i = min(self.max_pos-pos+1, len(kmers))
-            for i in range(max_i):
-                assert pos + i <= self.max_pos
-                freq_cloud = self.freq_clouds[pos + i]
-                inters = freq_cloud & set(kmers[i])
-                if verbose:
-                    print(pos, i, inters, len(inters),
-                          len(freq_cloud), len(kmers[i]))
-                score[0] += len(inters) >= 1
-                score[1] += len(inters)
-            if verbose:
-                print(f'pos: {pos}, i: {i}, score: {score}')
-            score = tuple(score)
-            # we want to take the rightmost best, so >= instead of >
-            if score[0] >= min_unit and \
-                    score[1] >= min_inters and \
-                    score >= best_score:
-                best_score = score
-                best_pos = pos
-        return best_score, best_pos
-
-    def score(self):
-        return len(self.freq_kmers)
+class SpecialCloudContig(CloudContig):
+    def get_score(self, max_freq=0):
+        score = 0
+        for kmer in self.freq_kmers:
+            cnt = 0
+            for pos in self.kmer_positions[kmer]:
+                if self.clouds[pos][kmer] > max_freq:
+                    cnt += 1
+            if cnt == 1:
+                score += 1
+        print(score)
+        return score
 
 
 def var_assess_quality(variant, q_ids, certain_rids, all_read_kmer_clouds,
                        locations, cloud_contig_minfreq):
-    cloud_contig = CloudContig(cloud_contig_minfreq)
+    cloud_contig = SpecialCloudContig(cloud_contig_minfreq)
     for r_id in certain_rids:
         cloud_contig.add_read(all_read_kmer_clouds[r_id],
                               position=locations[r_id][0][0])
-    base_score = cloud_contig.score()
+    base_score = cloud_contig.get_score()
     for i, q_id in enumerate(q_ids[:len(variant)]):
         loc = locations[q_id][variant[i]][0]
         cloud_contig.add_read(all_read_kmer_clouds[q_id],
                               position=loc)
-    return cloud_contig.score() - base_score
+    return cloud_contig.get_score() - base_score
 
 
 def get_best_variant(nrepeat,

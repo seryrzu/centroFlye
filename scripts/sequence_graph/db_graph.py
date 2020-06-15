@@ -471,7 +471,7 @@ def extract_read_pseudounits(covered_scaffolds, scaffolds,
 
 
 def polish(scaffolds, read_pseudounits, outdir, monomer_db,
-           n_iter=2, n_threads=30, flye_bin='flye'):
+           n_iter=4, n_threads=30, flye_bin='flye'):
 
     def get_template(raw_monostring, monomer_db):
         print(raw_monostring)
