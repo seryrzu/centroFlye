@@ -13,7 +13,8 @@ make -C ${BASH_SOURCE%/*}/scripts/read_recruitment
 ${BASH_SOURCE%/*}/scripts/read_recruitment/run_read_recruitment.sh \
     ${path_to_CHM13}/rel3.fastq.gz \
     ${OUTPUT}/centromeric_reads ${THREADS} 29000000 \
-    ${BASH_SOURCE%/*}/supplementary_data/D6Z1.fasta
+    ${BASH_SOURCE%/*}/supplementary_data/D6Z1.fasta \
+    550
 
 python ${BASH_SOURCE%/*}/scripts/ext/stringdecomposer/longreads_decomposer.py \
     -s ${OUTPUT}/centromeric_reads/centromeric_reads.fasta \
