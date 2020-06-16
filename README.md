@@ -1,6 +1,6 @@
 # centroFlye
 
-**Disclaimer:** The following description is aimed for reconstruction of assemblies presented in the Nature Biotechnology paper (see `Publications`).
+**Disclaimer:** The following description is aimed to reconstruct the assemblies presented in the Nature Biotechnology paper (see `Publications`).
 The latest stable assemblies are produced by a more recent version of centroFlye that can be found in `master` branch.
 [This](https://github.com/seryrzu/centroFlye_paper_scripts) github repository provides all supporting jupyter notebooks that are neccessary to replicate the results in the paper.
 For convenience that repository includes current branch of the main centroFlye repository as a submodule.
