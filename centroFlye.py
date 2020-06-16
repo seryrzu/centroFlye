@@ -262,7 +262,7 @@ class CentroFlye:
         print(list2str(polisher_cmd))
         subprocess.call(polisher_cmd)
         polished_assembly_fn = \
-            os.path.join(polisher_outdir, 'polished', 'polished_2.fasta')
+            os.path.join(polisher_outdir, 'polished', 'polished_4.fasta')
         return polished_assembly_fn
 
     def copy_final_assembly(self, polished_assembly_fn):
