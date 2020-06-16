@@ -5,6 +5,7 @@ The latest stable assemblies are produced by a more recent version of centroFlye
 [This](https://github.com/seryrzu/centroFlye_paper_scripts) github repository provides all supporting jupyter notebooks that are neccessary to replicate the results in the paper.
 For convenience that repository includes current branch of the main centroFlye repository as a submodule.
 
+
 ### Version 0.8.3 cenX + 0.1.3 cen6
 ## Overview
 centroFlye (Bzikadze et al., 2020) is an algorithm for centromere assembly using long error-prone reads.
@@ -12,6 +13,11 @@ Currently it supports assembly of a human centromere 6 (referred to as cen6) and
 Here we show how to apply it for the cen6 and cenX of the CHM13hTERT human cell line.
 The comparison of various cenX assemblies can be found in Bzikadze et al., 2020 and Mikheenko et al., 2020.
 
+# Cloning
+Please, clone the repository with submodules:
+```
+git clone --recurse-submodules --single-branch --branch cF_NatBiotech_paper_Xv0.8.3-6v0.1.3 git@github.com:seryrzu/centroFlye.git
+```
 
 ## Dependencies
 
