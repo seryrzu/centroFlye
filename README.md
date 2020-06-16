@@ -28,9 +28,12 @@ git clone --recurse-submodules --single-branch --branch cF_NatBiotech_paper_Xv0.
 + [biopython](https://pypi.org/project/biopython/) (tested on version 1.70)
 + [click](https://pypi.org/project/click/) (tested on version 7.0)
 + [joblib](https://pypi.org/project/joblib/) (tested on version 0.14.1)
++ [matplotlib](https://pypi.org/project/matplotlib/) (tested on version 3.0.2)
 + [networkx](https://pypi.org/project/networkx/) (tested on version 2.2)
 + [numpy](https://pypi.org/project/numpy/) (tested on version 1.16.1)
++ [plotly](https://pypi.org/project/plotly/) (tested on version 4.4.1)
 + [python-edlib](https://pypi.org/project/edlib/) (tested on version 1.2.4.post1)
++ [python-slugify](https://pypi.org/project/python-slugify/) (tested on version 4.0.0)
 + [regex](https://pypi.org/project/regex/) (tested on version 2.4.104)
 
 Required python packages can be installed through Conda with `conda install --file requirements.txt`.
