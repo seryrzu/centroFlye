@@ -37,7 +37,8 @@ Required python packages can be installed through Conda with `conda install --fi
 + [Flye](https://github.com/fenderglass/Flye) (*v2.5*, tested on commit: `315122d2ff58025aa4c38227239f431490b557ac`)
 + [Noise Cancelling Repeat Finder (NCRF)](https://github.com/makovalab-psu/NoiseCancellingRepeatFinder) (Tested on commit : `758206f1689ad1338cf7a841482dbf12548c337a`)
 
-Please note that all external software by default has to be in your `PATH`.
+Please note that all external software has to be in your `PATH`.
+Specifically binaries `flye` and `NCRF` have to be in `PATH`.
 
 ### Data
 + `<path_to_CHM13>` — path where the T2T ONT reads are located (rel2, Guppy flip-flop 2.3.1, used for cenX assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel2/rel2.fastq.gz); rel3, Guppy flip-flop 3.1.5, is used for cen6 assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel3/rel3.fastq.gz) ; also see [github](https://github.com/nanopore-wgs-consortium/CHM13)). The data is described in Miga, Koren et al., 2020.
