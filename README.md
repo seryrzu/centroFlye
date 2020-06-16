@@ -49,7 +49,9 @@ Specifically binaries `flye` and `NCRF` have to be in `PATH`.
 + `<path_to_CHM13>` — path where the T2T ONT reads are located (rel2, Guppy flip-flop 2.3.1, used for cenX assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel2/rel2.fastq.gz); rel3, Guppy flip-flop 3.1.5, is used for cen6 assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel3/rel3.fastq.gz) ; also see [github](https://github.com/nanopore-wgs-consortium/CHM13)). The data is described in Miga, Koren et al., 2020.
 
 ## Availability
-Final assembly and all intermediate results of the pipeline described below are published at [ZENODO](doi.org/10.5281/zenodo.3593460).
+The assemblies produced by the version of centroFlye in this branch are presented in the Nature Biotechnology paper (see `Publications`).
+These assemblies and all intermediate results of the pipeline described below are published at [ZENODO](http://doi.org/10.5281/zenodo.3593460).
+For the latest versions of any assemblies produced by centroFlye please consult the `master` branch.
 
 ## Quick start guide for cenX (centroFlye)
 
