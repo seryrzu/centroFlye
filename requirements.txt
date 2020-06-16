@@ -1,5 +1,7 @@
 biopython=1.70
-edlib=1.2.3
+click=7.0
+joblib=0.14.1
 networkx=2.2
 numpy=1.16.1
+python-edlib=1.2.4.post1
 regex=2018.11.22

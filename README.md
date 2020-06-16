@@ -25,11 +25,13 @@ git clone --recurse-submodules --single-branch --branch cF_NatBiotech_paper_Xv0.
 + Python 3.6
 
 ### Python packages:
-+ [Biopython](https://pypi.org/project/biopython/) (tested on version 1.70)
-+ [Edlib](https://pypi.org/project/edlib/) (tested on version 1.2.3)
-+ [Networkx](https://pypi.org/project/networkx/) (tested on version 2.2)
-+ [Numpy](https://pypi.org/project/numpy/) (tested on version 1.16.1)
-+ [Regex](https://pypi.org/project/regex/) (tested on version 2.4.104)
++ [biopython](https://pypi.org/project/biopython/) (tested on version 1.70)
++ [click](https://pypi.org/project/click/) (tested on version 7.0)
++ [joblib](https://pypi.org/project/joblib/) (tested on version 0.14.1)
++ [networkx](https://pypi.org/project/networkx/) (tested on version 2.2)
++ [numpy](https://pypi.org/project/numpy/) (tested on version 1.16.1)
++ [python-edlib](https://pypi.org/project/edlib/) (tested on version 1.2.4.post1)
++ [regex](https://pypi.org/project/regex/) (tested on version 2.4.104)
 
 Required python packages can be installed through Conda with `conda install --file requirements.txt`.
 
