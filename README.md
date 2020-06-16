@@ -175,7 +175,7 @@ bash scripts/read_recruitment/run_read_recruitment.sh \
 
 We use String Decomposer (SD; Dvorkina et al., 2020) to partition cen6 reads into distinct monomers of D6Z1.
 These monomers are supplied in the current repo at ``supplementary_data/D6Z1_monomers.fasta``.
-The result of this step is the report of SD is stored at `results_cen6/string_decomposer_report`
+The result of this step is the report of SD which is stored at `results_cen6/string_decomposer_report`
 
 The following commands take 50 threads
 ```
