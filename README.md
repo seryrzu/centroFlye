@@ -1,5 +1,9 @@
 # centroFlye
 
+**Disclaimer:** To replicate the assemblies from the Nature Biotechnology paper (see `Publications`), please consider branch `cF_NatBiotech_paper_Xv0.8.3-6v0.1.3`.
+The version of centroFlye (and the corresponding assemblies) in `master` branch will be more recent.
+
+
 ### Version 0.8.3 cenX + 0.1.3 cen6
 ## Overview
 centroFlye (Bzikadze et al., 2019) is an algorithm for centromere assembly using long error-prone reads.
