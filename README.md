@@ -31,6 +31,8 @@ git clone --recurse-submodules --single-branch --branch cF_NatBiotech_paper_Xv0.
 + [Numpy](https://pypi.org/project/numpy/) (tested on version 1.16.1)
 + [Regex](https://pypi.org/project/regex/) (tested on version 2.4.104)
 
+Required python packages can be installed through Conda with `conda install --file requirements.txt`.
+
 ### External software
 + [Flye](https://github.com/fenderglass/Flye) (*v2.5*, tested on commit: `315122d2ff58025aa4c38227239f431490b557ac`)
 + [Noise Cancelling Repeat Finder (NCRF)](https://github.com/makovalab-psu/NoiseCancellingRepeatFinder) (Tested on commit : `758206f1689ad1338cf7a841482dbf12548c337a`)
