@@ -51,7 +51,7 @@ Specifically binaries `flye` and `NCRF` have to be in `PATH`.
 
 ## Availability
 The assemblies produced by the version of centroFlye in this branch are presented in the Nature Biotechnology paper (see `Publications`).
-These assemblies and all intermediate results of the pipeline described below are published at [ZENODO](http://doi.org/10.5281/zenodo.3593460).
+These assemblies and all intermediate results of the pipeline described below are published at [ZENODO](http://doi.org/10.5281/zenodo.3897531).
 For the latest versions of any assemblies produced by centroFlye please consult the `master` branch.
 
 ## Quick start guide for cenX (centroFlye)
