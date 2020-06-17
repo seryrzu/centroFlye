@@ -5,6 +5,7 @@ matplotlib=3.0.2
 networkx=2.2
 numpy=1.16.1
 plotly=4.4.1
+pydot=1.4.1
 python-edlib=1.2.4.post1
 python-slugify=4.0.0
 regex=2018.11.22

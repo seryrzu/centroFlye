@@ -32,6 +32,7 @@ git clone --recurse-submodules --single-branch --branch cF_NatBiotech_paper_Xv0.
 + [networkx](https://pypi.org/project/networkx/) (tested on version 2.2)
 + [numpy](https://pypi.org/project/numpy/) (tested on version 1.16.1)
 + [plotly](https://pypi.org/project/plotly/) (tested on version 4.4.1)
++ [pydot](https://pypi.org/project/pydot/) (tested on version 1.4.1)
 + [python-edlib](https://pypi.org/project/edlib/) (tested on version 1.2.4.post1)
 + [python-slugify](https://pypi.org/project/python-slugify/) (tested on version 4.0.0)
 + [regex](https://pypi.org/project/regex/) (tested on version 2.4.104)
