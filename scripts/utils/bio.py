@@ -41,12 +41,19 @@ def RC(s):
     return s.translate(trans)[::-1]
 
 
-def write_bio_seqs(filename, seqs):
+def write_bio_seqs(filename, seqs, width=60):
     with open(filename, 'w') as f:
         for seq_id, seq in seqs.items():
             print(f'>{seq_id}', file=f)
-            print(seq, file=f)
-
+            if width is None:
+                print(seq, file=f)
+                continue
+            start=0
+            seq_len = len(seq)
+            while seq_len - start >= width:
+                print(seq[start:start+width], file=f)
+                start += width
+            print(seq[start:], file=f)
 
 def reverse_seq(seq):
     rev_seq = list(seq[::-1])
