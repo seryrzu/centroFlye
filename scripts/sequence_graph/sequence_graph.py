@@ -5,6 +5,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 import logging
+import pickle
 from subprocess import check_call
 
 import networkx as nx
@@ -46,6 +47,12 @@ class SequenceGraph(ABC):
         self.db_index = None
         if collapse:
             self.collapse_nonbranching_paths()
+
+    @classmethod
+    def from_pickle(cls, fn):
+        with open(fn, 'rb') as f:
+            db_graph = pickle.load(f)
+        return db_graph
 
     @classmethod
     @abstractmethod
@@ -304,3 +311,8 @@ class SequenceGraph(ABC):
         if export_pdf:
             pdffile = f'{outfile}.pdf'
             check_call(['dot','-Tpdf', dotfile,'-o', pdffile])
+
+    def pickle_dump(self, fn):
+        with open(fn, 'wb') as f:
+            pickle.dump(self, f)
+
