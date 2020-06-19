@@ -75,8 +75,8 @@ def get_idb(string_set,
                                       min_tip_cov=min_mult)
         ncc = nx.number_weakly_connected_components(db.nx_graph)
         logger.info(f'#cc = {ncc}')
-        for cc in nx.weakly_connected_components(db.nx_graph):
-            logger.info(len(cc))
+        for i, cc in enumerate(nx.weakly_connected_components(db.nx_graph)):
+            logger.info(f'{i}-th cc is of size = {len(cc)}')
 
         dot_file = os.path.join(outdir, f'db_k{k}.dot')
         db.write_dot(outfile=dot_file, export_pdf=False)
