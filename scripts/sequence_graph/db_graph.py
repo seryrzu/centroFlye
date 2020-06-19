@@ -5,6 +5,7 @@
 import logging
 
 from collections import defaultdict, Counter
+import pickle
 import statistics
 import subprocess
 
@@ -197,8 +198,6 @@ class DeBruijnGraph(SequenceGraph):
                 paths = all_simple_edge_paths(self.nx_graph, n1, n2,
                                               cutoff=cutoff)
                 paths = list(paths)
-                if n1 == 212 and n2 == 1346:
-                    print(paths)
                 if len(paths) > 1:
                     for path in paths:
                         path = tuple(path)
