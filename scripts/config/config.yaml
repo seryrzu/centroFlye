@@ -1,0 +1,5 @@
+common:
+    threads: 4
+idb:
+    mink: 100
+    maxk: 300
