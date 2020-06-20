@@ -12,7 +12,7 @@ logger = logging.getLogger("centroFlye.utils.kmers")
 
 def _split_seq_ignored_char(seq, ignored_chars=None):
     if ignored_chars is None:
-        return seq
+        return [(0, seq)]
     i, j = 0, 0
     split_seqs = []
     while j < len(seq):
@@ -33,12 +33,13 @@ assert _split_seq_ignored_char((1, 2, '?', '*', 3, 4),
                                ignored_chars=set('?*')) == [(0, (1, 2)),
                                                             (4, (3, 4))]
 
+
 def get_kmer_index_seq(seq, mink, maxk, ignored_chars=None, positions=False):
     kmer_index = get_kmer_index({'seq': seq},
-                                 mink=mink,
-                                 maxk=maxk,
-                                 ignored_chars=ignored_chars,
-                                 positions=positions)
+                                mink=mink,
+                                maxk=maxk,
+                                ignored_chars=ignored_chars,
+                                positions=positions)
     if positions:
         for k in range(mink, maxk+1):
             for kmer, pos in kmer_index[k].items():

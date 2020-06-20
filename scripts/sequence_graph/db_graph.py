@@ -173,7 +173,7 @@ class DeBruijnGraph(SequenceGraph):
                         self.nodeindex2label[node]
 
                     kp1 = in_kmer + (out_kmer[-1],)
-                    if kmer_index[kp1] >= min_mult:
+                    if kp1 in kmer_index and kmer_index[kp1] >= min_mult:
                         selected_kp1mers[kp1] = kmer_index[kp1]
         return selected_kp1mers
 
