@@ -10,52 +10,79 @@ from utils.various import fst_iterable, index
 logger = logging.getLogger("centroFlye.utils.kmers")
 
 
-def get_kmer_index_seq(seq, mink, maxk, ignored_chars=None, positions=False):
+def _split_seq_ignored_char(seq, ignored_chars=None):
     if ignored_chars is None:
-        ignored_chars = set()
-    assert 0 < mink <= maxk
-    kmerindex = {}
-    for k in range(mink, maxk+1):
-        if positions:
-            kmerindex[k] = defaultdict(set)
-        else:
-            kmerindex[k] = Counter()
-        for i in range(len(seq)-k+1):
-            kmer = seq[i:i+k]
-            if len(set(kmer) & ignored_chars) == 0:
-                kmer = tuple(kmer)
-                if positions:
-                    kmerindex[k][kmer].add(i)
-                else:
-                    kmerindex[k][kmer] += 1
-    return kmerindex
+        return seq
+    i, j = 0, 0
+    split_seqs = []
+    while j < len(seq):
+        if seq[j] in ignored_chars:
+            if i != j:
+                split_seq = seq[i:j]
+                assert len(ignored_chars & set(split_seq)) == 0
+                split_seqs.append((i, split_seq))
+            i = j + 1
+        j += 1
+    if i < len(seq):
+        assert len(ignored_chars & set(seq[i:])) == 0
+        split_seqs.append((i, seq[i:]))
+    return split_seqs
+
+
+assert _split_seq_ignored_char((1, 2, '?', '*', 3, 4),
+                               ignored_chars=set('?*')) == [(0, (1, 2)),
+                                                            (4, (3, 4))]
+
+def get_kmer_index_seq(seq, mink, maxk, ignored_chars=None, positions=False):
+    kmer_index = get_kmer_index({'seq': seq},
+                                 mink=mink,
+                                 maxk=maxk,
+                                 ignored_chars=ignored_chars,
+                                 positions=positions)
+    if positions:
+        for k in range(mink, maxk+1):
+            for kmer, pos in kmer_index[k].items():
+                pos = [p[1] for p in pos]
+                kmer_index[k][kmer] = pos
+    return kmer_index
 
 
 def get_kmer_index(seqs, mink, maxk, ignored_chars=None, positions=False):
-    if ignored_chars is None:
-        ignored_chars = set()
-    logger.info(f'Extracting kmer index mink={mink}, maxk={maxk}. '
+    logger.info(f'Extracting kmer index mink={mink}, maxk={maxk}'
                 f'Positions={positions}')
     assert 0 < mink <= maxk
-    if positions:
-        kmer_index = {k: defaultdict(set) for k in range(mink, maxk+1)}
-    else:
-        kmer_index = {k: Counter() for k in range(mink, maxk+1)}
+    kmer_index = {k: defaultdict(set) for k in range(mink, maxk+1)}
+
     nseqs = len(seqs)
+    logger.info(f'Building index for maxk={maxk}')
     for i, (s_id, seq) in enumerate(seqs.items()):
         if i % 1000 == 0:
-            logger.debug(f'{i+1} / {nseqs}')
-        ms_index = get_kmer_index_seq(seq, mink=mink, maxk=maxk,
-                                      ignored_chars=ignored_chars,
-                                      positions=positions)
+            logger.info(f'{i+1} / {nseqs}')
+
+        split_seqs = _split_seq_ignored_char(seq, ignored_chars=ignored_chars)
+
+        for i, seq in split_seqs:
+            if len(seq) < mink:
+                continue
+            k = min(maxk, len(seq))
+            for j in range(len(seq)-k+1):
+                kmer = seq[j:j+k]
+                kmer_index[k][kmer].add((s_id, i+j))
+
+    for k in range(maxk-1, mink-1, -1):
+        logger.info(f'Building index for k={k}')
+        for kp1mer, pos in kmer_index[k+1].items():
+            left_kmer = kp1mer[:-1]
+            right_kmer = kp1mer[1:]
+            kmer_index[k][left_kmer] |= pos
+            kmer_index[k][right_kmer] |= \
+                set((s_id, i+1) for (s_id, i) in pos)
+
+    if not positions:
         for k in range(mink, maxk+1):
-            if positions:
-                for kmer, pos in ms_index[k].items():
-                    for p in pos:
-                        kmer_index[k][kmer].add((s_id, p))
-            else:
-                for kmer, cnt in ms_index[k].items():
-                    kmer_index[k][kmer] += cnt
+            kmer_index[k] = {kmer: len(pos)
+                             for kmer, pos in kmer_index[k].items()}
+
     logger.info(f'Finished extracting kmer index')
     return kmer_index
 

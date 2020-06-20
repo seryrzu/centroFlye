@@ -82,7 +82,8 @@ class MonoInstance:
 
 
 class MonoString:
-    # monostring is stored as a list because |monomer_db| often exceeds |ascii|
+    # monostring is stored as a tuple because
+    # |monomer_db| often exceeds |ascii|
     gap_symb = '?'
     reverse_symb = "'"
     none_monomer = 'None'
@@ -207,6 +208,7 @@ class MonoString:
                 else:
                     assert monoinstance.reliability == Reliability.UNRELIABLE
                     string.append(cls.gap_symb)
+            string = tuple(string)
             return string
 
         # logger.debug(f'Constructing raw_monostring for sequence {seq_id}')
@@ -289,10 +291,11 @@ class MonoString:
         assert 0 <= st < en < len(self.nucl_sequence)
         return self.nucl_sequence[st:en]
 
-    def get_kmer_index(self, mink, maxk):
+    def get_kmer_index(self, mink, maxk, positions=False):
         return get_kmer_index_seq(seq=self.raw_monostring,
                                   mink=mink, maxk=maxk,
-                                  ignored_chars=set([self.gap_symb]))
+                                  ignored_chars=set([self.gap_symb]),
+                                  positions=positions)
 
     def get_identities(self):
         identities = []
