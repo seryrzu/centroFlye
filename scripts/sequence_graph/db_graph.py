@@ -5,7 +5,6 @@
 import logging
 
 from collections import defaultdict, Counter
-import pickle
 import statistics
 import subprocess
 
@@ -17,7 +16,7 @@ import os
 from tqdm import tqdm
 
 from sequence_graph.sequence_graph import SequenceGraph
-from utils.bio import read_bio_seq, write_bio_seqs, parse_cigar
+from utils.bio import read_bio_seq, write_bio_seqs
 from utils.nx_all_simple_paths_multigraph import all_simple_edge_paths
 from utils.os_utils import smart_makedirs
 from utils.various import fst_iterable
@@ -188,6 +187,69 @@ class DeBruijnGraph(SequenceGraph):
                 kmer = tuple(kmer)
                 kmers[kmer] = coverage[i]
         return kmers
+
+    def get_unique_edges(self, mappings=None):
+        def get_topologically_unique_edges(db):
+            db_cnds = nx.condensation(db.nx_graph)
+            edges = []
+            for s, e in db_cnds.edges:
+                scc1, scc2 = db_cnds.nodes[s], db_cnds.nodes[e]
+                scc1 = scc1['members']
+                scc2 = scc2['members']
+                for n1 in scc1:
+                    for n2 in scc2:
+                        key = 0
+                        while True:
+                            if db.nx_graph.has_edge(n1, n2, key=key):
+                                edges.append((n1, n2, key))
+                                key += 1
+                            else:
+                                break
+            edges = set(edges)
+            return edges
+
+        def get_mapping_unique_edges(mappings):
+            l_ext, r_ext = defaultdict(list), defaultdict(list)
+            non_unique = set()
+
+            for mapping in mappings.values():
+                if mapping is not None and mapping.valid:
+                    edges_cnt = Counter(mapping.epath)
+                    for edge, cnt in edges_cnt.items():
+                        if cnt > 1:
+                            non_unique.add(edge)
+
+            for s_id, mapping in mappings.items():
+                if mapping is not None and mapping.valid:
+                    path = mapping.epath
+                    for i, edge in enumerate(path):
+                        if edge in non_unique:
+                            continue
+                        ex_l_ext, ex_r_ext = l_ext[edge], r_ext[edge]
+                        c_l_ext, c_r_ext = path[:i], path[i+1:]
+                        min_l_ext = min(len(c_l_ext), len(ex_l_ext))
+                        min_r_ext = min(len(c_r_ext), len(ex_r_ext))
+
+                        if min_l_ext != 0 and \
+                                c_l_ext[-min_l_ext:] != ex_l_ext[-min_l_ext:]:
+                            non_unique.add(edge)
+                            continue
+                        if c_r_ext[:min_r_ext] != ex_r_ext[:min_r_ext]:
+                            non_unique.add(edge)
+                            continue
+
+                        if len(c_l_ext) > len(ex_l_ext):
+                            l_ext[edge] = c_l_ext
+                        if len(c_r_ext) > len(ex_r_ext):
+                            r_ext[edge] = c_r_ext
+
+            unique = set(l_ext.keys()) - non_unique
+            return unique
+
+        unique_edges = get_topologically_unique_edges(self)
+        if mappings is not None:
+            unique_edges |= get_mapping_unique_edges(mappings)
+        return unique_edges
 
     def detect_bubbles(self, max_diff=1, cutoff=1):
         paths_set = set()
@@ -373,34 +435,6 @@ def map_monoreads2scaffolds(monoreads, scaffolds, max_nloc=1):
                             k=0,
                             additionalEqualities=add_matches)
         locs = align['locations']
-        # if len(locs) == 2 and locs[0][1] >= 11924 and locs[1][0] <= 14393:
-            # f_s, f_e = locs[0]
-            # s_s, s_e = locs[1]
-            # f_s = monoassembly.monoinstances[f_s].st
-            # f_e = monoassembly.monoinstances[f_e].en
-            # s_s = monoassembly.monoinstances[s_s].st
-            # s_e = monoassembly.monoinstances[s_e].en
-            # r_s = monoread.monoinstances[0].st
-            # r_e = monoread.monoinstances[-1].en
-            # strand = '+' if not monoread.is_reversed else '-'
-            # print(s_id, locs)
-            # cigar, cnt, a1, a2 = parse_cigar(align['cigar'], monoread, scaffold[locs[0][0]:locs[0][1]+1])
-            # for c1, c2 in zip(a1, a2):
-            #     print(c1, c2)
-
-
-        #     align = edlib.align(monoread,
-        #                         scaffold,
-        #                         mode='HW',
-        #                         task='locations',
-        #                         k=10,
-        #                         additionalEqualities=add_matches)
-        #     locs = align['locations']
-        #     print(locs)
-        #     for st, en in locs:
-        #         diff = [(a, b) for a, b in zip(monoread, scaffold[st:en+1])
-        #                 if a != b and a != '?']
-        #         print(diff)
         return locs
 
     all_locations = {}
