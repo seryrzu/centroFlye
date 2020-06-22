@@ -3,11 +3,14 @@
 # Released under the BSD license (see LICENSE file)
 
 import logging
+import os
 
 import networkx as nx
 import numpy as np
 
+from sequence_graph.idb_graph import get_db_monostring_set
 from sequence_graph.sequence_graph import SequenceGraph
+from utils.os_utils import smart_makedirs
 
 logger = logging.getLogger("centroFlye.sequence_graph.db_graph_3col")
 
@@ -18,7 +21,6 @@ class DeBruijnGraph3Color(SequenceGraph):
     col_assembly = 'blue'
     col_reads = 'red'
     col_both = 'green'
-
 
     def __init__(self, nx_graph, nodeindex2label, nodelabel2index, k,
                  collapse=True):
@@ -119,6 +121,37 @@ class DeBruijnGraph3Color(SequenceGraph):
                        collapse=collapse)
         return db_graph
 
+    @classmethod
+    def from_read_db_and_assembly(cls, gr_reads, assembly, outdir=None):
+        k = gr_reads.k
+        gr_assembly, _ = get_db_monostring_set(assembly,
+                                               k=k,
+                                               outdir=None,
+                                               mode='assembly')
+        color3graph = cls.from_db_graphs(gr_assembly=gr_assembly,
+                                         gr_reads=gr_reads)
+        if outdir is not None:
+            smart_makedirs(outdir)
+
+            asm_dot_file = os.path.join(outdir, f'db_asm_k{k}.dot')
+            gr_assembly.write_dot(outfile=asm_dot_file, export_pdf=False)
+
+            asm_dot_compact_file = os.path.join(outdir,
+                                                f'db_asm_k{k}_compact.dot')
+            gr_assembly.write_dot(outfile=asm_dot_compact_file,
+                                  export_pdf=True,
+                                  compact=True)
+            asm_pickle_file = os.path.join(outdir, f'db_asm_k{k}.pickle')
+            gr_assembly.pickle_dump(asm_pickle_file)
+
+            c3g_dot_file = os.path.join(outdir, f'c3g_k{k}.dot')
+            color3graph.write_dot(outfile=c3g_dot_file,
+                                  export_pdf=True,
+                                  compact=True)
+            c3g_pickle_file = os.path.join(outdir, f'c3g_k{k}.pickle')
+            color3graph.pickle_dump(c3g_pickle_file)
+        return color3graph
+
     def _add_edge(self, node, color, string,
                   in_node, out_node,
                   in_data, out_data,
@@ -155,7 +188,6 @@ class DeBruijnGraph3Color(SequenceGraph):
                                assembly_coverage=assembly_cov,
                                label=label,
                                color=color)
-
 
     def get_kmers_on_edges(self, color=None):
         kmer2edge = {}
