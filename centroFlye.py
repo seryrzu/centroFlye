@@ -46,6 +46,10 @@ def parse_args():
     if params.mode != 'ont':
         print('ERROR. Only the ont mode is supported so far')
         sys.exit(2)
+
+    # override config
+    config['common']['threads'] = params.threads
+
     return params
 
 
@@ -82,6 +86,7 @@ def main():
 
     logger.info(f'cmd: {sys.argv}')
     logger.info(f'git hash: {get_git_revision_short_hash()}')
+    logger.info(f'config: {config}')
 
     centroFlye(logger).run(params)
 
