@@ -3,3 +3,9 @@ common:
 idb:
     mink: 100
     maxk: 300
+scaffolding:
+    min_connections: 1
+polishing:
+    n_iter: 4
+    min_cov: 3
+    max_nloc: 1
