@@ -13,14 +13,15 @@ sys.path.append(os.path.join(this_dirname, 'scripts'))
 
 from standard_logger import get_logger
 
-from config.config import get_config
+from config.config import config, copy_config
 from sd_parser.sd_parser import SD_Report
 from sequence_graph.idb_graph import get_idb_monostring_set
-from scripts.utils.bio import read_bio_seqs
+from sequence_graph.db_graph_scaffolding import monoscaffolds2scaffolds
+from utils.git import get_git_revision_short_hash
 from utils.os_utils import smart_makedirs
 
 
-def parse_args(config):
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--reads',
                         help='Path to centromeric reads',
@@ -49,8 +50,7 @@ def parse_args(config):
 
 
 class centroFlye:
-    def __init__(self, config, logger):
-        self.config = config
+    def __init__(self, logger):
         self.logger = logger
 
     def run(self, params):
@@ -61,20 +61,29 @@ class centroFlye:
         idb_outdir = os.path.join(params.outdir, 'idb')
         dbs, all_frequent_kmers = \
             get_idb_monostring_set(string_set=sd_report.monostring_set,
-                                   mink=self.config['idb']['mink'],
-                                   maxk=self.config['idb']['maxk'],
+                                   mink=config['idb']['mink'],
+                                   maxk=config['idb']['maxk'],
                                    outdir=idb_outdir,
                                    mode=params.mode)
+        db = dbs[config['idb']['maxk']]
+        scaffolding_outdir = os.path.join(params.outdir, 'scaffolding')
+        monoscaffolds2scaffolds(db, sd_report.monostring_set,
+                                outdir=scaffolding_outdir)
 
 
 def main():
-    config = get_config()
-    params = parse_args(config)
+    params = parse_args()
     smart_makedirs(params.outdir)
+    copy_config(params.outdir)
+
     logfn = os.path.join(params.outdir, 'centroFlye.log')
     logger = get_logger(logfn,
                         logger_name='centroFlye')
-    centroFlye(config, logger).run(params)
+
+    logger.info(f'cmd: {sys.argv}')
+    logger.info(f'git hash: {get_git_revision_short_hash()}')
+
+    centroFlye(logger).run(params)
 
 
 if __name__ == "__main__":

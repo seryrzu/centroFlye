@@ -26,6 +26,7 @@ def get_idb(string_set,
             ignored_chars=None,
             step=1):
 
+    logger.info(f'IDB will be saved to {outdir}')
     assert mode in ['ont', 'hifi', 'assembly']
     if get_min_mult is None:
         get_min_mult = def_get_min_mult
