@@ -2,7 +2,10 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+from config.config import config
 import logging
+import os
+from subprocess import check_call
 
 import pandas as pd
 
@@ -10,7 +13,7 @@ from monomers.monomer_db import MonomerDB
 from monomers.monostring_set import MonoStringSet
 
 from utils.bio import read_bio_seqs
-from utils.os_utils import expandpath
+from utils.os_utils import smart_makedirs
 
 logger = logging.getLogger("centroFlye.sd_parser.sd_parser")
 
@@ -74,3 +77,20 @@ class SD_Report:
         self.monomer_db = monomer_db
         self.report = report
         self.monostring_set = monostring_set
+
+
+def run_SD(sequences_fn, monomers_fn, outdir='.',
+           outfn='final_decomposition.tsv',
+           n_threads=config["common"]["threads"]):
+    logger.info(f'Running SD on')
+    logger.info(f'\tSequences = {sequences_fn}')
+    logger.info(f'\tMonomers = {monomers_fn}')
+    logger.info(f'\tOutdir = {outdir}')
+    smart_makedirs(outdir)
+    outfn = os.path.join(outdir, outfn)
+    cmd = f'{config["binaries"]["SD"]} {sequences_fn} {monomers_fn} ' + \
+          f'-t {n_threads} -o {outfn}'
+    logger.info(cmd)
+    cmd = cmd.split(' ')
+    # check_call(cmd)
+    return outfn
