@@ -145,9 +145,9 @@ def scaffolding(db, mappings,
             edge_scaffold = left_ext + edge_scaffold + right_ext
             edge_scaffolds.append(edge_scaffold)
 
-        logger.info(f'# edge scaffolds {len(edge_scaffolds)}:')
+        logger.info(f'# edge scaffolds {len(edge_scaffolds)}')
         for i, edge_scaffold in enumerate(edge_scaffolds):
-            logger.info(f'{i}: {edge_scaffold}')
+            logger.debug(f'{i}: {edge_scaffold}')
 
         if outdir is not None:
             scaffolds_fn = os.path.join(outdir, 'edge_scaffolds.txt')

@@ -15,15 +15,15 @@ class PathDeBruijnGraph(DeBruijnGraph):
         self.__dict__.update(raw_pathdb.__dict__)
 
     @classmethod
-    def from_db(cls, db, strings, k, outdir=None):
+    def from_db(cls, db, string_set, k, outdir=None):
         logger.info('Constructing a path graph')
-        mappings = db.map_strings(strings)
+        mappings = db.map_strings(string_set)
         paths = {s_id: db.get_path(mapping.epath)
                  for s_id, mapping in mappings.items()
                  if mapping is not None and mapping.valid}
         logger.info(f'Extracted {len(paths)} paths')
 
         # TODO: rename. mode assembly is for min mult of a kmer == 1
-        raw_pathdb, _ = get_db(strings, k, outdir, mode='assembly')
+        raw_pathdb, _ = get_db(paths, k, outdir, mode='assembly')
         pathdb = cls(raw_pathdb)
         return pathdb

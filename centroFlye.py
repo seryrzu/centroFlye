@@ -15,8 +15,9 @@ from standard_logger import get_logger
 
 from config.config import config, copy_config
 from sd_parser.sd_parser import SD_Report
-from sequence_graph.idb_graph import get_idb_monostring_set
 from sequence_graph.db_graph_scaffolding import monoscaffolds2scaffolds
+from sequence_graph.idb_graph import get_idb_monostring_set
+from sequence_graph.path_graph import PathDeBruijnGraph
 from utils.git import get_git_revision_short_hash
 from utils.os_utils import smart_makedirs
 
@@ -62,16 +63,22 @@ class centroFlye:
                               monomers_fn=params.monomers,
                               sequences_fn=params.reads,
                               mode=params.mode)
+        monoread_set = sd_report.monostring_set
         idb_outdir = os.path.join(params.outdir, 'idb')
         dbs, all_frequent_kmers = \
-            get_idb_monostring_set(string_set=sd_report.monostring_set,
+            get_idb_monostring_set(string_set=monoread_set,
                                    mink=config['idb']['mink'],
                                    maxk=config['idb']['maxk'],
                                    outdir=idb_outdir,
                                    mode=params.mode)
         db = dbs[config['idb']['maxk']]
+        path_db_outdir = os.path.join(params.outdir, 'path_db')
+        path_db = PathDeBruijnGraph.from_db(db=db,
+                                            string_set=monoread_set,
+                                            k=config['path_db']['k'],
+                                            outdir=path_db_outdir)
         scaffolding_outdir = os.path.join(params.outdir, 'scaffolding')
-        monoscaffolds2scaffolds(db, sd_report.monostring_set,
+        monoscaffolds2scaffolds(path_db, sd_report.monostring_set,
                                 outdir=scaffolding_outdir)
 
 
