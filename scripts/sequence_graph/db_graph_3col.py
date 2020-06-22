@@ -8,7 +8,7 @@ import os
 import networkx as nx
 import numpy as np
 
-from sequence_graph.idb_graph import get_db_monostring_set
+import sequence_graph.idb_graph
 from sequence_graph.sequence_graph import SequenceGraph
 from utils.os_utils import smart_makedirs
 
@@ -124,10 +124,8 @@ class DeBruijnGraph3Color(SequenceGraph):
     @classmethod
     def from_read_db_and_assembly(cls, gr_reads, assembly, outdir=None):
         k = gr_reads.k
-        gr_assembly, _ = get_db_monostring_set(assembly,
-                                               k=k,
-                                               outdir=None,
-                                               mode='assembly')
+        gr_assembly, _ = sequence_graph.idb_graph.get_db_monostring_set(
+            assembly, k=k, outdir=None, mode='assembly')
         color3graph = cls.from_db_graphs(gr_assembly=gr_assembly,
                                          gr_reads=gr_reads)
         if outdir is not None:

@@ -14,12 +14,12 @@ sys.path.append(os.path.join(this_dirname, 'scripts'))
 from standard_logger import get_logger
 
 from config.config import config, copy_config
-from sd_parser.sd_parser import SD_Report
+from sd_parser.sd_parser import SD_Report, run_SD
 from sequence_graph.db_graph_scaffolding import monoscaffolds2scaffolds
 from sequence_graph.idb_graph import get_idb_monostring_set
 from sequence_graph.path_graph import PathDeBruijnGraph
 from utils.git import get_git_revision_short_hash
-from utils.os_utils import smart_makedirs
+from utils.os_utils import expandpath, smart_makedirs
 
 
 def parse_args():
@@ -43,10 +43,20 @@ def parse_args():
     parser.add_argument('--mode',
                         help='ont/hifi',
                         default='ont')
+    parser.add_argument('-a', '--assembly',
+                        help='Assembly for comparison')
     params = parser.parse_args()
     if params.mode != 'ont':
         print('ERROR. Only the ont mode is supported so far')
         sys.exit(2)
+
+    params.reads = expandpath(params.reads)
+    params.monomers = expandpath(params.monomers)
+    params.outdir = expandpath(params.outdir)
+    if params.sd_report is not None:
+        params.sd_report = expandpath(params.sd_report)
+    if params.assembly is not None:
+        params.assembly = expandpath(params.assembly)
 
     # override config
     config['common']['threads'] = params.threads
@@ -59,22 +69,39 @@ class centroFlye:
         self.logger = logger
 
     def run(self, params):
+        if params.assembly is not None:
+            assembly_sd_report_outdir = os.path.join(params.outdir,
+                                                     'SD_assembly')
+            assembly_sd_report_fn = run_SD(sequences_fn=params.assembly,
+                                           monomers_fn=params.monomers,
+                                           outdir=assembly_sd_report_outdir)
+            assembly_sd_report = SD_Report(sd_report_fn=assembly_sd_report_fn,
+                                           monomers_fn=params.monomers,
+                                           sequences_fn=params.assembly,
+                                           mode='assembly')
+            monoassembly = assembly_sd_report.monostring_set
+        else:
+            monoassembly = None
+
         sd_report = SD_Report(sd_report_fn=params.sd_report,
                               monomers_fn=params.monomers,
                               sequences_fn=params.reads,
                               mode=params.mode)
         monoread_set = sd_report.monostring_set
+
         idb_outdir = os.path.join(params.outdir, 'idb')
         dbs, all_frequent_kmers = \
             get_idb_monostring_set(string_set=monoread_set,
                                    mink=config['idb']['mink'],
                                    maxk=config['idb']['maxk'],
+                                   assembly=monoassembly,
                                    outdir=idb_outdir,
                                    mode=params.mode)
         db = dbs[config['idb']['maxk']]
         path_db_outdir = os.path.join(params.outdir, 'path_db')
         path_db = PathDeBruijnGraph.from_db(db=db,
                                             string_set=monoread_set,
+                                            assembly=monoassembly,
                                             k=config['path_db']['k'],
                                             outdir=path_db_outdir)
         scaffolding_outdir = os.path.join(params.outdir, 'scaffolding')

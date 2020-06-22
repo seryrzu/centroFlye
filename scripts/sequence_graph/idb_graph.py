@@ -9,6 +9,7 @@ import os
 import networkx as nx
 
 from sequence_graph.db_graph import DeBruijnGraph
+from sequence_graph.db_graph_3col import DeBruijnGraph3Color
 from utils.kmers import get_kmer_index, \
     def_get_min_mult, def_get_frequent_kmers
 from utils.os_utils import smart_makedirs
@@ -20,6 +21,7 @@ def get_idb(string_set,
             mink, maxk,
             outdir,
             mode='ont',
+            assembly=None,
             get_min_mult=None,
             get_frequent_kmers=None,
             all_kmer_index=None,
@@ -89,11 +91,15 @@ def get_idb(string_set,
 
             dot_compact_file = os.path.join(outdir, f'db_k{k}_compact.dot')
             db.write_dot(outfile=dot_compact_file,
-                        export_pdf=(k == maxk),
-                        compact=True)
+                         export_pdf=(k == maxk),
+                         compact=True)
             pickle_file = os.path.join(outdir, f'db_k{k}.pickle')
             db.pickle_dump(pickle_file)
 
+            if assembly is not None:
+                DeBruijnGraph3Color.from_read_db_and_assembly(gr_reads=db,
+                                                              assembly=assembly,
+                                                              outdir=outdir)
         dbs[k] = db
 
         if k < maxk:
@@ -113,6 +119,7 @@ def get_db(string_set,
            k,
            outdir,
            mode='ont',
+           assembly=None,
            get_min_mult=None,
            get_frequent_kmers=None,
            kmer_index=None,
@@ -126,6 +133,7 @@ def get_db(string_set,
                 mink=k, maxk=k,
                 outdir=outdir,
                 mode=mode,
+                assembly=assembly,
                 get_min_mult=get_min_mult,
                 get_frequent_kmers=get_frequent_kmers,
                 all_kmer_index=all_kmer_index,
@@ -139,6 +147,7 @@ def get_idb_monostring_set(string_set,
                            mink, maxk,
                            outdir,
                            mode='ont',
+                           assembly=None,
                            get_min_mult=None,
                            get_frequent_kmers=None,
                            all_kmer_index=None,
@@ -150,6 +159,7 @@ def get_idb_monostring_set(string_set,
                    mink=mink, maxk=maxk,
                    outdir=outdir,
                    mode=mode,
+                   assembly=assembly,
                    get_min_mult=get_min_mult,
                    get_frequent_kmers=get_frequent_kmers,
                    all_kmer_index=all_kmer_index,
@@ -160,6 +170,7 @@ def get_db_monostring_set(string_set,
                           k,
                           outdir,
                           mode='ont',
+                          assembly=None,
                           get_min_mult=None,
                           get_frequent_kmers=None,
                           kmer_index=None,
@@ -173,6 +184,7 @@ def get_db_monostring_set(string_set,
                                mink=k, maxk=k,
                                outdir=outdir,
                                mode=mode,
+                               assembly=assembly,
                                get_min_mult=get_min_mult,
                                get_frequent_kmers=get_frequent_kmers,
                                all_kmer_index=all_kmer_index,
