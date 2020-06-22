@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 from config.config import config
 from utils.bio import read_bio_seq, write_bio_seqs
 from utils.os_utils import smart_makedirs
+from utils.various import fst_iterable
 
 logger = logging.getLogger("centroFlye.sequence_graph.db_graph_scaffolding")
 
@@ -192,12 +193,17 @@ def map_monoreads2scaffolds(monoreads, scaffolds,
         locs = align['locations']
         return locs
 
-    all_locations = {}
-    for i, scaffold in enumerate(scaffolds):
-        all_locations[i] = {}
-        for s_id, monoread in monoreads.items():
+    all_locations = {i: {} for i in range(len(scaffolds))}
+    for s_id, monoread in monoreads.items():
+        seq_locs = {}
+        for i, scaffold in enumerate(scaffolds):
             locs = map_monoread2scaffold(monoread, scaffold, gap_symb_matching)
-            if 0 < len(locs) <= max_nloc:
+            if len(locs) > 0:
+                seq_locs[i] = locs
+        if len(seq_locs) == 1:
+            i, locs = fst_iterable(seq_locs.items())
+            assert len(locs) > 0
+            if len(locs) <= max_nloc:
                 all_locations[i][s_id] = locs
     return all_locations
 
