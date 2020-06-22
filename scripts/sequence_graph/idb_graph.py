@@ -123,3 +123,28 @@ def get_idb_monostring_set(string_set,
                    get_frequent_kmers=get_frequent_kmers,
                    all_kmer_index=all_kmer_index,
                    step=step)
+
+def get_db_monostring_set(string_set,
+                          k,
+                          outdir,
+                          mode='ont',
+                          get_min_mult=None,
+                          get_frequent_kmers=None,
+                          kmer_index=None,
+                          step=1):
+    if kmer_index is None:
+        all_kmer_index = string_set.get_kmer_index(mink=k, maxk=k)
+    else:
+        all_kmer_index= {k: kmer_index}
+    dbs, all_frequent_kmers = \
+        get_idb_monostring_set(string_set=string_set,
+                               mink=k, maxk=k,
+                               outdir=outdir,
+                               mode=mode,
+                               get_min_mult=get_min_mult,
+                               get_frequent_kmers=get_frequent_kmers,
+                               all_kmer_index=all_kmer_index,
+                               step=step)
+    db = dbs[k]
+    frequent_kmers = all_frequent_kmers[k]
+    return db, frequent_kmers
