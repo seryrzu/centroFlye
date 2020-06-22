@@ -49,16 +49,16 @@ def get_kmer_index_seq(seq, mink, maxk, ignored_chars=None, positions=False):
 
 
 def get_kmer_index(seqs, mink, maxk, ignored_chars=None, positions=False):
-    logger.info(f'Extracting kmer index mink={mink}, maxk={maxk}'
+    logger.info(f'Extracting kmer index mink={mink}, maxk={maxk} '
                 f'Positions={positions}')
     assert 0 < mink <= maxk
     kmer_index = {k: defaultdict(set) for k in range(mink, maxk+1)}
 
     nseqs = len(seqs)
-    logger.info(f'Building index for maxk={maxk}')
+    logger.debug(f'Building index for maxk={maxk}')
     for i, (s_id, seq) in enumerate(seqs.items()):
         if i % 1000 == 0:
-            logger.info(f'{i+1} / {nseqs}')
+            logger.debug(f'{i+1} / {nseqs}')
 
         split_seqs = _split_seq_ignored_char(seq, ignored_chars=ignored_chars)
 
@@ -71,7 +71,7 @@ def get_kmer_index(seqs, mink, maxk, ignored_chars=None, positions=False):
                 kmer_index[k][kmer].add((s_id, i+j))
 
     for k in range(maxk-1, mink-1, -1):
-        logger.info(f'Building index for k={k}')
+        logger.debug(f'Building index for k={k}')
         for kp1mer, pos in kmer_index[k+1].items():
             left_kmer = kp1mer[:-1]
             right_kmer = kp1mer[1:]
