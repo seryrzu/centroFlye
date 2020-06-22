@@ -1,12 +1,14 @@
+binaries:
+    SD: './scripts/ext/stringdecomposer/run_decomposer.py'
 common:
     threads: 4
 idb:
     mink: 100
-    maxk: 300
-path_db:
-    k: 600
+    maxk: 100
 scaffolding:
     min_connections: 1
+path_db:
+    k: 300
 polishing:
     n_iter: 4
     min_cov: 3
