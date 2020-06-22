@@ -26,7 +26,12 @@ def get_idb(string_set,
             ignored_chars=None,
             step=1):
 
-    logger.info(f'IDB will be saved to {outdir}')
+    if outdir is not None:
+        logger.info(f'IDB will be saved to {outdir}')
+        smart_makedirs(outdir)
+    else:
+        logger.info('IDB will not be saved — outdir is None')
+
     assert mode in ['ont', 'hifi', 'assembly']
     if get_min_mult is None:
         get_min_mult = def_get_min_mult
@@ -41,7 +46,6 @@ def get_idb(string_set,
         assert all(k in all_kmer_index.keys()
                    for k in range(mink, maxk+1, step))
 
-    smart_makedirs(outdir)
     dbs = {}
     all_frequent_kmers = {}
 
@@ -79,15 +83,16 @@ def get_idb(string_set,
         for i, cc in enumerate(nx.weakly_connected_components(db.nx_graph)):
             logger.info(f'{i}-th cc is of size = {len(cc)}')
 
-        dot_file = os.path.join(outdir, f'db_k{k}.dot')
-        db.write_dot(outfile=dot_file, export_pdf=False)
+        if outdir is not None:
+            dot_file = os.path.join(outdir, f'db_k{k}.dot')
+            db.write_dot(outfile=dot_file, export_pdf=False)
 
-        dot_compact_file = os.path.join(outdir, f'db_k{k}_compact.dot')
-        db.write_dot(outfile=dot_compact_file,
-                     export_pdf=(k == maxk),
-                     compact=True)
-        pickle_file = os.path.join(outdir, f'db_k{k}.pickle')
-        db.pickle_dump(pickle_file)
+            dot_compact_file = os.path.join(outdir, f'db_k{k}_compact.dot')
+            db.write_dot(outfile=dot_compact_file,
+                        export_pdf=(k == maxk),
+                        compact=True)
+            pickle_file = os.path.join(outdir, f'db_k{k}.pickle')
+            db.pickle_dump(pickle_file)
 
         dbs[k] = db
 
@@ -102,6 +107,32 @@ def get_idb(string_set,
             complex_kp1mers = \
                 db.get_paths_thru_complex_nodes(all_kmer_index[k+1])
     return dbs, all_frequent_kmers
+
+
+def get_db(string_set,
+           k,
+           outdir,
+           mode='ont',
+           get_min_mult=None,
+           get_frequent_kmers=None,
+           kmer_index=None,
+           step=1):
+    if kmer_index is not None:
+        all_kmer_index = {k: kmer_index}
+    else:
+        all_kmer_index = None
+    dbs, all_frequent_kmers = \
+        get_idb(string_set=string_set,
+                mink=k, maxk=k,
+                outdir=outdir,
+                mode=mode,
+                get_min_mult=get_min_mult,
+                get_frequent_kmers=get_frequent_kmers,
+                all_kmer_index=all_kmer_index,
+                step=step)
+    db = dbs[k]
+    frequent_kmers = all_frequent_kmers[k]
+    return db, frequent_kmers
 
 
 def get_idb_monostring_set(string_set,
@@ -124,6 +155,7 @@ def get_idb_monostring_set(string_set,
                    all_kmer_index=all_kmer_index,
                    step=step)
 
+
 def get_db_monostring_set(string_set,
                           k,
                           outdir,
@@ -135,7 +167,7 @@ def get_db_monostring_set(string_set,
     if kmer_index is None:
         all_kmer_index = string_set.get_kmer_index(mink=k, maxk=k)
     else:
-        all_kmer_index= {k: kmer_index}
+        all_kmer_index = {k: kmer_index}
     dbs, all_frequent_kmers = \
         get_idb_monostring_set(string_set=string_set,
                                mink=k, maxk=k,
