@@ -88,6 +88,9 @@ def run_SD(sequences_fn, monomers_fn, outdir='.',
     logger.info(f'\tOutdir = {outdir}')
     smart_makedirs(outdir)
     outfn = os.path.join(outdir, outfn)
+    if os.path.isfile(outfn):
+        logger.info(f'File {outfn} exists. Reusing')
+        return outfn
     cmd = f'{config["binaries"]["SD"]} {sequences_fn} {monomers_fn} ' + \
           f'-t {n_threads} -o {outfn}'
     logger.info(cmd)
