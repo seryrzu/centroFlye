@@ -34,8 +34,7 @@ def parse_args():
                         help='Output directory',
                         required=True)
     parser.add_argument('-s', '--sd-report',
-                        help='Path to SD report',
-                        required=True)
+                        help='Path to SD report')
     parser.add_argument('-t', '--threads',
                         help='Number of threads',
                         type=int,
@@ -58,8 +57,8 @@ def parse_args():
     if params.assembly is not None:
         params.assembly = expandpath(params.assembly)
 
-    # override config
-    config['common']['threads'] = params.threads
+    # override config TODO make singleton
+    # config['common']['threads'] = params.threads
 
     return params
 
@@ -69,12 +68,29 @@ class centroFlye:
         self.logger = logger
 
     def run(self, params):
+        if params.sd_report is None:
+            reads_sd_report_outdir = os.path.join(params.outdir,
+                                                  'SD_reads')
+            reads_sd_report_fn = run_SD(sequences_fn=params.reads,
+                                        monomers_fn=params.monomers,
+                                        outdir=reads_sd_report_outdir,
+                                        n_threads=params.threads)
+        else:
+            reads_sd_report_fn = params.sd_report
+
+        sd_report = SD_Report(sd_report_fn=reads_sd_report_fn,
+                              monomers_fn=params.monomers,
+                              sequences_fn=params.reads,
+                              mode=params.mode)
+        monoread_set = sd_report.monostring_set
+
         if params.assembly is not None:
             assembly_sd_report_outdir = os.path.join(params.outdir,
                                                      'SD_assembly')
             assembly_sd_report_fn = run_SD(sequences_fn=params.assembly,
                                            monomers_fn=params.monomers,
-                                           outdir=assembly_sd_report_outdir)
+                                           outdir=assembly_sd_report_outdir,
+                                           n_threads=params.threads)
             assembly_sd_report = SD_Report(sd_report_fn=assembly_sd_report_fn,
                                            monomers_fn=params.monomers,
                                            sequences_fn=params.assembly,
@@ -82,12 +98,6 @@ class centroFlye:
             monoassembly = assembly_sd_report.monostring_set
         else:
             monoassembly = None
-
-        sd_report = SD_Report(sd_report_fn=params.sd_report,
-                              monomers_fn=params.monomers,
-                              sequences_fn=params.reads,
-                              mode=params.mode)
-        monoread_set = sd_report.monostring_set
 
         idb_outdir = os.path.join(params.outdir, 'idb')
         dbs, all_frequent_kmers = \
