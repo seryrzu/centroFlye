@@ -4,11 +4,11 @@ common:
     threads: 4
 idb:
     mink: 100
-    maxk: 100
+    maxk: 300
 scaffolding:
     min_connections: 1
 path_db:
-    k: 300
+    k: 600
 polishing:
     n_iter: 4
     min_cov: 3

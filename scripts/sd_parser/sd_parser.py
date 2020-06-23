@@ -92,5 +92,5 @@ def run_SD(sequences_fn, monomers_fn, outdir='.',
           f'-t {n_threads} -o {outfn}'
     logger.info(cmd)
     cmd = cmd.split(' ')
-    # check_call(cmd)
+    check_call(cmd)
     return outfn
