@@ -156,100 +156,24 @@ class MonoStringSet:
     def items(self):
         return self.monostrings.items()
 
-    # def  _correct_likely_hybrids(self, consensuses):
-    #     for s_id, monostring in self.monostrings.items():
-    #         monostring.correct_likely_hybrids(consensuses)
-
-    def correct_likely_hybrids(self, bubbles, hybrids, k):
-        self.monomer_db.extend_db(hybrids)
-
-        kmer_index_w_pos = self.get_kmer_index(mink=k, maxk=k, positions=True)
-        kmer_index_w_pos = kmer_index_w_pos[k]
+    def make_corrections(self, string_pairs, k=None, kmer_index=None):
+        assert (k is None) != (kmer_index is None)
+        if kmer_index is None:
+            kmer_index = self.get_kmer_index(mink=k, maxk=k)
+            kmer_index = kmer_index[k]
 
         readpos_to_change = set()
-        for str1, str2 in bubbles:
+        for str1, str2 in string_pairs:
             diff = [i for i, (a, b) in enumerate(zip(str1, str2)) if a != b]
             for d in diff:
-                a, b = str1[d], str2[d]
-                pair = min(a, b), max(a, b)
-                if pair not in hybrids:
-                    continue
-                hybrid_index = self.monomer_db.id2index[pair]
-                bottom = max(0, d-k+1)
-                top = 1 + min(d, len(str1)-k)
+                bottom = max(0, d-k)
+                top = 1 + min(d+k, len(str1)-k)
                 for p in range(bottom, top):
                     i = d-p
                     assert 0 <= i < k
-                    for kmer in [str1[p:p+k], str2[p:p+k]]:
-                        kmer = tuple(kmer)
-                        assert kmer in kmer_index_w_pos
-                        for (s_id, s) in kmer_index_w_pos[kmer]:
-                            readpos_to_change.add((s_id, s+i, hybrid_index))
-                            assert self.monostrings[s_id][s+i] == kmer[i]
+                    kmer = str1[p:p+k]
+                    for (s_id, s) in kmer_index[kmer]:
+                        readpos_to_change.add((s_id, s+i, str2[d]))
+                        assert self.monostrings[s_id][s+i] == str1[d]
         for s_id, p, mono_index in readpos_to_change:
-            print(s_id, p, mono_index)
             self.monostrings[s_id][p] = mono_index
-
-        self.hybrids_corrected = True
-
-    # def correct_likely_hybrids_depr(self, k=101):
-    #     # This function is not used
-    #     kmer_index_w_pos = self.get_kmer_index(mink=k, maxk=k, positions=True)
-    #     kmer_index_w_pos = kmer_index_w_pos[k]
-
-    #     k2 = k//2
-    #     while True:
-    #         # kmer_index_wo_pos = {kmer: len(pos)
-    #         #                      for kmer, pos in kmer_index_w_pos.items()}
-
-    #         # # TODO add mode
-    #         # min_mult = def_get_min_mult(k=k, mode='ont')
-    #         # frequent_kmers = \
-    #         #     def_get_frequent_kmers(kmer_index_wo_pos,
-    #         #                            string_set=self,
-    #         #                            min_mult=min_mult)
-    #         # frequent_kmers_w_pos = {kmer: kmer_index_w_pos[kmer]
-    #         #                         for kmer in frequent_kmers}
-    #         top_subst = correct_kmers(kmer_index_w_pos=kmer_index_w_pos,
-    #                                   string_set=self)
-    #         if top_subst is None:
-    #             break
-    #         kmer, mono_index = top_subst
-    #         print(kmer, mono_index)
-    #         for s_id, pos in kmer_index_w_pos[kmer].copy():
-    #             print(s_id, pos)
-    #             monostring = self.monostrings[s_id]
-
-    #             bottom = max(0, pos-k2)
-    #             top = 1 + min(pos+k2, len(monostring)-k)
-    #             for p in range(bottom, top):
-    #                 i = pos-p+k2
-    #                 p_kmer = tuple(monostring[p:p+k])
-    #                 mut_kmer = list(p_kmer)
-    #                 mut_kmer[i] = mono_index
-    #                 mut_kmer = tuple(mut_kmer)
-    #                 if (s_id, p) in kmer_index_w_pos[p_kmer]:
-    #                     kmer_index_w_pos[mut_kmer].add((s_id, p))
-    #                     kmer_index_w_pos[p_kmer].remove((s_id, p))
-    #             to_remove = []
-    #             for kmer in kmer_index_w_pos:
-    #                 if len(kmer_index_w_pos[kmer]) == 0:
-    #                     to_remove.append(kmer)
-    #             for kmer in to_remove:
-    #                 del kmer_index_w_pos[kmer]
-
-    #             change_pos = pos + k2
-    #             monostring.raw_monostring[change_pos] = mono_index
-
-    #         # assert_kmer_index_w_pos = self.get_kmer_index(mink=k,
-    #         #                                     maxk=k,
-    #         #                                     positions=True)
-    #         # assert_kmer_index_w_pos = assert_kmer_index_w_pos[k]
-    #         # for kmer in kmer_index_w_pos:
-    #         #     if kmer_index_w_pos[kmer] != assert_kmer_index_w_pos[kmer]:
-    #         #         print(kmer_index_w_pos[kmer] - assert_kmer_index_w_pos[kmer])
-    #         #         print(assert_kmer_index_w_pos[kmer] - kmer_index_w_pos[kmer])
-    #         # assert kmer_index_w_pos == assert_kmer_index_w_pos
-    #         print("")
-
-    #     self.hybrids_corrected = True

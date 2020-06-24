@@ -10,7 +10,6 @@ import networkx as nx
 import numpy as np
 
 from sequence_graph.sequence_graph import SequenceGraph
-from utils.nx_all_simple_paths_multigraph import all_simple_edge_paths
 
 
 logger = logging.getLogger("centroFlye.sequence_graph.db_graph")
@@ -244,69 +243,3 @@ class DeBruijnGraph(SequenceGraph):
         for edge in unique_edges:
             logger.info(f'\t{edge}')
         return unique_edges
-
-    def detect_bubbles(self, max_diff=1, cutoff=1):
-        paths_set = set()
-        for n1 in self.nx_graph.nodes:
-            for n2 in self.nx_graph.nodes:
-                if n1 == n2:
-                    continue
-                paths = all_simple_edge_paths(self.nx_graph, n1, n2,
-                                              cutoff=cutoff)
-                paths = list(paths)
-                if len(paths) > 1:
-                    for path in paths:
-                        path = tuple(path)
-                        paths_set.add(path)
-
-        all_lens2paths = defaultdict(lambda: defaultdict(list))
-        for path in paths_set:
-            fst_edge, lst_edge = path[0], path[-1]
-            s = fst_edge[0]
-            e = lst_edge[1]
-            string = self.get_path(path)
-            all_lens2paths[(s, e)][len(string)].append(path)
-
-        # all_selected_paths = set()
-        for s, e in list(all_lens2paths):
-            filt_lens2paths = \
-                {k: v for k, v in all_lens2paths[(s, e)].items()
-                 if len(v) == 2}
-            if len(filt_lens2paths):
-                all_lens2paths[(s, e)] = filt_lens2paths
-                # for path in filt_lens2paths.values():
-                #     path = tuple(path)
-                #     all_selected_paths.add(path)
-            else:
-                del all_lens2paths[(s, e)]
-
-        path2strCov = defaultdict(list)
-        for (s, e), len2paths in all_lens2paths.items():
-            print(s, e)
-            for length, paths in len2paths.items():
-                for path in paths:
-                    string = self.get_path(path)
-                    path_coverages = []
-                    for edge in path:
-                        edge_data = self.nx_graph.get_edge_data(*edge)
-                        coverage = edge_data[self.coverage]
-                        coverage = np.mean(coverage)
-                        path_coverages.append(coverage)
-                    path_coverage = np.min(path_coverages)
-                    print(path, path_coverage)
-                    path2strCov[(s, e)].append((string, path_coverage))
-
-        bubbles = []
-        for (s, e), ((str1, cov1), (str2, cov2)) in path2strCov.items():
-            diff = [i for i, (a, b) in enumerate(zip(str1, str2)) if a != b]
-            print(s, e, len(diff), str1[diff[0]], str2[diff[0]])
-            if len(diff) > max_diff:
-                continue
-            if cov1 >= cov2:
-                bubbles.append((str2, str1))
-                # self.nx_graph.remove_edge(s, e, 1)
-            else:
-                bubbles.append((str1, str2))
-                # self.nx_graph.remove_edge(s, e, 0)
-        # self.collapse_nonbranching_paths()
-        return bubbles
