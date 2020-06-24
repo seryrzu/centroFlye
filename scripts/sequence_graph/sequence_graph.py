@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 import logging
 import pickle
-from subprocess import check_call
+from subprocess import Popen
 
 import networkx as nx
 
@@ -310,9 +310,12 @@ class SequenceGraph(ABC):
         nx.drawing.nx_pydot.write_dot(graph, dotfile)
         if export_pdf:
             pdffile = f'{outfile}.pdf'
-            check_call(['dot','-Tpdf', dotfile,'-o', pdffile])
+            # https://stackoverflow.com/a/3516106
+            Popen(['dot','-Tpdf', dotfile,'-o', pdffile],
+                  shell=True,
+                  stdin=None, stdout=None, stderr=None,
+                  close_fds=True)
 
     def pickle_dump(self, fn):
         with open(fn, 'wb') as f:
             pickle.dump(self, f)
-
