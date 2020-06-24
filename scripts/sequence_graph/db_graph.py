@@ -144,7 +144,7 @@ class DeBruijnGraph(SequenceGraph):
                 complex_nodes.append(node)
         return complex_nodes
 
-    def get_paths_thru_complex_nodes(self, kmer_index, min_mult=2):
+    def get_paths_thru_complex_nodes(self, kmer_index, min_mult=4):
         complex_nodes = self.get_complex_nodes()
         k = self.k
 
