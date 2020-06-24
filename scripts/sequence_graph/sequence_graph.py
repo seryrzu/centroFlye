@@ -311,10 +311,11 @@ class SequenceGraph(ABC):
         if export_pdf:
             pdffile = f'{outfile}.pdf'
             # https://stackoverflow.com/a/3516106
-            Popen(['dot','-Tpdf', dotfile,'-o', pdffile],
-                  shell=True,
-                  stdin=None, stdout=None, stderr=None,
-                  close_fds=True)
+            cmd = ['dot','-Tpdf', dotfile,'-o', pdffile]
+            proc = Popen(cmd,
+                         shell=False,
+                         stdin=None, stdout=None, stderr=None,
+                         close_fds=True)
 
     def pickle_dump(self, fn):
         with open(fn, 'wb') as f:
