@@ -139,7 +139,7 @@ class MonoStringSet:
         if return_stats:
             return stats
 
-    def get_kmer_index(self, mink, maxk, positions=False):
+    def get_kmer_index(self, mink, maxk, positions=True):
         assert len(self.monostrings) > 0
         gap_symb = fst_iterable(self.monostrings.values()).gap_symb
         return get_kmer_index(seqs=self.monostrings,

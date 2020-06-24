@@ -291,7 +291,7 @@ class MonoString:
         assert 0 <= st < en < len(self.nucl_sequence)
         return self.nucl_sequence[st:en]
 
-    def get_kmer_index(self, mink, maxk, positions=False):
+    def get_kmer_index(self, mink, maxk, positions=True):
         return get_kmer_index_seq(seq=self.raw_monostring,
                                   mink=mink, maxk=maxk,
                                   ignored_chars=set([self.gap_symb]),

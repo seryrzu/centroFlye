@@ -48,7 +48,7 @@ def get_kmer_index_seq(seq, mink, maxk, ignored_chars=None, positions=False):
     return kmer_index
 
 
-def get_kmer_index(seqs, mink, maxk, ignored_chars=None, positions=False):
+def get_kmer_index(seqs, mink, maxk, ignored_chars=None, positions=True):
     logger.info(f'Extracting kmer index mink={mink}, maxk={maxk} '
                 f'Positions={positions}')
     assert 0 < mink <= maxk
@@ -125,8 +125,29 @@ def def_get_frequent_kmers(kmer_index, string_set,
     assert len(kmer_index) > 0
     k = len(fst_iterable(kmer_index))
 
-    frequent_kmers = {kmer: cnt for kmer, cnt in kmer_index.items()
-                      if cnt >= min_mult}
+    frequent_kmers = {kmer: len(pos) for kmer, pos in kmer_index.items()
+                      if len(pos) >= min_mult}
+
+    # s_id -> pos
+    left_freq = defaultdict(lambda: 2**32)
+    right_freq = defaultdict(int)
+
+    for kmer in frequent_kmers:
+        for s_id, p in kmer_index[kmer]:
+            left_freq[s_id] = min(left_freq[s_id], p)
+            right_freq[s_id] = max(right_freq[s_id], p)
+
+    ext_frequent_kmers = {}
+    for kmer, pos in kmer_index.items():
+        if len(pos) < min_mult_rescue:
+            continue
+        for s_id, p in pos:
+            if left_freq[s_id] <= p <= right_freq[s_id]:
+                ext_frequent_kmers[kmer] = len(pos)
+                break
+
+    return ext_frequent_kmers
+
 
     def get_first_reliable(kmers):
         for i, kmer in enumerate(kmers):
