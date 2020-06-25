@@ -28,9 +28,10 @@ logger = logging.getLogger("centroFlye.sequence_graph.db_graph_scaffolding")
 def monoscaffolds2scaffolds(db, monoreads, outdir,
                             n_threads=config['common']['threads']):
     logger.info(f'Scaffolding will be output to {outdir}')
-    mappings = db.map_strings(monoreads)
+    paths = db.map_strings(monoreads, only_unique_paths=True)
+
     scaffolds, edge_scaffolds = \
-        scaffolding(db, mappings, outdir=os.path.join(outdir, 'scaffolding'))
+        scaffolding(db, paths, outdir=os.path.join(outdir, 'scaffolding'))
     locations = map_monoreads2scaffolds(monoreads, scaffolds)
     covered_scaffolds = \
         cover_scaffolds_w_reads(locations, monoreads, scaffolds,
@@ -47,15 +48,12 @@ def monoscaffolds2scaffolds(db, monoreads, outdir,
                      flye_bin='flye')
 
 
-def scaffolding(db, mappings,
+def scaffolding(db, paths,
                 min_connections=config['scaffolding']['min_connections'],
                 outdir=None):
     def find_connections():
         connections = defaultdict(lambda: defaultdict(int))
-        for r_id, mapping in mappings.items():
-            if mapping is None or not mapping.valid:
-                continue
-            path = mapping.epath
+        for r_id, (path, e_st, e_en) in paths.items():
             mapped_edges = set(path)
             inters = mapped_edges & long_edges
             if len(inters) > 1:
@@ -112,10 +110,7 @@ def scaffolding(db, mappings,
         right_edge = longedge_scaffold[-1]
         lst_left_ext = []
         lst_right_ext = []
-        for r_id, mapping in mappings.items():
-            if mapping is None or not mapping.valid:
-                continue
-            path = mapping.epath
+        for r_id, (path, e_st, e_en) in paths.items():
             try:
                 left_index = path.index(left_edge)
                 left_ext = path[:left_index]
@@ -164,7 +159,7 @@ def scaffolding(db, mappings,
             scaffolds.append(scaffold)
         return scaffolds
 
-    long_edges = db.get_unique_edges(mappings=mappings)
+    long_edges = db.get_unique_edges(paths=paths)
     connections = find_connections()
     scaffold_graph = build_scaffold_graph(connections)
     longedge_scaffolds = select_lists(scaffold_graph)

@@ -261,6 +261,7 @@ class SequenceGraph(ABC):
         return contigs, valid_paths
 
     def map_strings(self, string_set, overlap_penalty, neutral_symbs,
+                    only_unique_paths=False,
                     outdir=None):
         def find_overlaps(string_set=string_set,
                           overlap_penalty=overlap_penalty,
@@ -438,7 +439,18 @@ class SequenceGraph(ABC):
                 for s_id in unique_mapping:
                     print(s_id, file=f)
 
-        return chains
+        if not only_unique_paths:
+            return chains
+
+        paths = {}
+        for r_id in unique_mapping:
+            chain = chains[r_id][0]
+            path = [overlap.edge for overlap in chain.overlap_list]
+            e_st = chain.overlap_list[0].e_st
+            e_en = chain.overlap_list[-1].e_en
+            paths[r_id] = (path, e_st, e_en)
+        return paths
+
 
     def map_strings_old(self, strings):
         Mapping = namedtuple('Mapping', ['s_st', 's_en', 'valid', 'epath'])

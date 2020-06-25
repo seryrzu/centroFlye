@@ -178,7 +178,7 @@ class DeBruijnGraph(SequenceGraph):
                 kmers[kmer] = coverage[i]
         return kmers
 
-    def get_unique_edges(self, mappings=None):
+    def get_unique_edges(self, paths=None):
         def get_topologically_unique_edges(db):
             db_cnds = nx.condensation(db.nx_graph)
             edges = []
@@ -198,54 +198,59 @@ class DeBruijnGraph(SequenceGraph):
             edges = set(edges)
             return edges
 
-        def get_mapping_unique_edges(mappings):
+        def get_mapping_unique_edges(chains):
             l_ext, r_ext = defaultdict(list), defaultdict(list)
             non_unique = set()
 
-            for mapping in mappings.values():
-                if mapping is not None and mapping.valid:
-                    edges_cnt = Counter(mapping.epath)
-                    for edge, cnt in edges_cnt.items():
-                        if cnt > 1:
-                            non_unique.add(edge)
+            for r_id, r_chains in chains.items():
+                # use uniquely mapped reads
+                if len(r_chains) != 1:
+                    continue
+                chain = r_chains[0]
+                path = [overlap.edge for overlap in chain.overlap_list]
+                edges_cnt = Counter(path)
+                for edge, cnt in edges_cnt.items():
+                    if cnt > 1:
+                        non_unique.add(edge)
 
-            for s_id, mapping in mappings.items():
-                if mapping is not None and mapping.valid:
-                    path = mapping.epath
-                    for i, edge in enumerate(path):
-                        if edge in non_unique:
-                            continue
-                        ex_l_ext, ex_r_ext = l_ext[edge], r_ext[edge]
-                        c_l_ext, c_r_ext = path[:i], path[i+1:]
-                        min_l_ext = min(len(c_l_ext), len(ex_l_ext))
-                        min_r_ext = min(len(c_r_ext), len(ex_r_ext))
+            for r_id, (path, e_st, e_en) in paths.items():
+                for i, edge in enumerate(path):
+                    if edge in non_unique:
+                        continue
+                    ex_l_ext, ex_r_ext = l_ext[edge], r_ext[edge]
+                    c_l_ext, c_r_ext = path[:i], path[i+1:]
+                    min_l_ext = min(len(c_l_ext), len(ex_l_ext))
+                    min_r_ext = min(len(c_r_ext), len(ex_r_ext))
 
-                        if min_l_ext != 0 and \
-                                c_l_ext[-min_l_ext:] != ex_l_ext[-min_l_ext:]:
-                            non_unique.add(edge)
-                            continue
-                        if c_r_ext[:min_r_ext] != ex_r_ext[:min_r_ext]:
-                            non_unique.add(edge)
-                            continue
+                    if min_l_ext != 0 and \
+                            c_l_ext[-min_l_ext:] != ex_l_ext[-min_l_ext:]:
+                        non_unique.add(edge)
+                        continue
+                    if c_r_ext[:min_r_ext] != ex_r_ext[:min_r_ext]:
+                        non_unique.add(edge)
+                        continue
 
-                        if len(c_l_ext) > len(ex_l_ext):
-                            l_ext[edge] = c_l_ext
-                        if len(c_r_ext) > len(ex_r_ext):
-                            r_ext[edge] = c_r_ext
+                    if len(c_l_ext) > len(ex_l_ext):
+                        l_ext[edge] = c_l_ext
+                    if len(c_r_ext) > len(ex_r_ext):
+                        r_ext[edge] = c_r_ext
 
             unique = set(l_ext.keys()) - non_unique
             return unique
 
         unique_edges = get_topologically_unique_edges(self)
-        if mappings is not None:
-            unique_edges |= get_mapping_unique_edges(mappings)
+        if paths is not None:
+            unique_edges |= get_mapping_unique_edges(paths)
         logger.info('Unique edges:')
         for edge in unique_edges:
             logger.info(f'\t{edge}')
         return unique_edges
 
-    def map_strings(self, string_set, neutral_symbs, outdir=None):
+    def map_strings(self, string_set, neutral_symbs,
+                    only_unique_paths=False,
+                    outdir=None):
         return super().map_strings(string_set=string_set,
                                    overlap_penalty=self.k,
                                    neutral_symbs=neutral_symbs,
+                                   only_unique_paths=only_unique_paths,
                                    outdir=outdir)
