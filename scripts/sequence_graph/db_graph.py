@@ -243,3 +243,9 @@ class DeBruijnGraph(SequenceGraph):
         for edge in unique_edges:
             logger.info(f'\t{edge}')
         return unique_edges
+
+    def map_strings(self, string_set, neutral_symbs, outdir=None):
+        return super().map_strings(string_set=string_set,
+                                   overlap_penalty=self.k,
+                                   neutral_symbs=neutral_symbs,
+                                   outdir=outdir)
