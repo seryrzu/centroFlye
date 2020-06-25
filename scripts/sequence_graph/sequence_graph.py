@@ -276,6 +276,7 @@ class SequenceGraph(ABC):
     def map_strings(self, string_set, overlap_penalty, neutral_symbs,
                     only_unique_paths=False,
                     outdir=None):
+        def find_string_overlaps(cjj)
         def find_overlaps(string_set=string_set,
                           overlap_penalty=overlap_penalty,
                           neutral_symbs=neutral_symbs):
@@ -360,9 +361,9 @@ class SequenceGraph(ABC):
             chains = []
             for overlap in string_overlaps:
                 overlap_len = overlap.e_en - overlap.e_st
-                best_lenght = overlap_len
+                best_length = overlap_len
                 best_chains = [Chain(overlap_list=[overlap],
-                                     length=best_lenght)]
+                                     length=best_length)]
                 v2, w, _ = overlap.edge
                 for chain in chains:
                     last_overlap = chain.overlap_list[-1]
@@ -383,7 +384,7 @@ class SequenceGraph(ABC):
                     new_overlap_list.append(overlap)
                     new_chain = Chain(overlap_list=new_overlap_list,
                                       length=new_length)
-                    if new_length > best_lenght:
+                    if new_length > best_length:
                         best_length = new_length
                         best_chains = [new_chain]
                     elif new_length == best_length:
@@ -466,8 +467,7 @@ class SequenceGraph(ABC):
             paths[r_id] = (path, e_st, e_en)
         return paths
 
-
-    def map_strings_old(self, strings):
+    def map_strings_fast(self, strings):
         Mapping = namedtuple('Mapping', ['s_st', 's_en', 'valid', 'epath'])
         index = self.index_edges()
         mappings = {}
