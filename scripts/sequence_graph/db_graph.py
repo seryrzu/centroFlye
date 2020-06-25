@@ -5,6 +5,7 @@
 import logging
 
 from collections import defaultdict, Counter
+from config.config import config
 
 import networkx as nx
 import numpy as np
@@ -248,9 +249,11 @@ class DeBruijnGraph(SequenceGraph):
 
     def map_strings(self, string_set, neutral_symbs,
                     only_unique_paths=False,
-                    outdir=None):
+                    outdir=None,
+                    n_threads=config['common']['threads']):
         return super().map_strings(string_set=string_set,
                                    overlap_penalty=self.k,
                                    neutral_symbs=neutral_symbs,
                                    only_unique_paths=only_unique_paths,
-                                   outdir=outdir)
+                                   outdir=outdir,
+                                   n_threads=n_threads)

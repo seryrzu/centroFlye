@@ -3,6 +3,7 @@
 # Released under the BSD license (see LICENSE file)
 
 from bisect import bisect_left
+from itertools import islice
 
 import numpy as np
 
@@ -20,6 +21,10 @@ def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
+def chunks_dict(data, n):
+    data_items = list(data.items())
+    for i in range(0, len(data), n):
+        yield dict(data_items[i:i+n])
 
 def take_closest(myList, myNumber):
     """

@@ -4,13 +4,15 @@
 
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
+from config.config import config
 import logging
 import os
 import pickle
 from subprocess import Popen
 
-import edlib
 import networkx as nx
+
+from sequence_graph.mapping import find_overlaps, get_chains
 
 from utils.os_utils import smart_makedirs
 from utils.various import fst_iterable
@@ -275,158 +277,19 @@ class SequenceGraph(ABC):
 
     def map_strings(self, string_set, overlap_penalty, neutral_symbs,
                     only_unique_paths=False,
-                    outdir=None):
-        def find_string_overlaps(cjj)
-        def find_overlaps(string_set=string_set,
-                          overlap_penalty=overlap_penalty,
-                          neutral_symbs=neutral_symbs):
-            if len(neutral_symbs) == 0:
-                neutral_symbs = set(['?'])
-
-            alphabet = set()
-            for string in string_set.values():
-                alphabet |= set(string)
-            addEq = []
-            for neutral_symb in neutral_symbs:
-                addEq += [(neutral_symb, c) for c in alphabet]
-            logger.info(f'Additional equalities = {addEq}')
-
-            overlaps = defaultdict(list)
-            neutral_symb = fst_iterable(neutral_symbs)
-            for i, (s_id, monostring) in enumerate(string_set.items()):
-                monolen = len(monostring)
-                neutral_run_len = max(0, monolen - overlap_penalty)
-                neutral_run = neutral_symb * neutral_run_len
-                neutral_run = tuple(neutral_run)
-                for edge in self.nx_graph.edges:
-                    edge_data = self.nx_graph.get_edge_data(*edge)
-                    edge_string = edge_data['string']
-                    ext_edge_string = neutral_run + edge_string + neutral_run
-                    align = edlib.align(monostring,
-                                        ext_edge_string,
-                                        mode='HW',
-                                        k=0,
-                                        task='locations',
-                                        additionalEqualities=addEq)
-                    locations = align['locations']
-                    if len(locations) == 0:
-                        continue
-                    for e_st, e_en in locations:
-                        e_en += 1  # [e_s; e_e)
-                        assert e_en - e_st == monolen
-
-                        # 0123456789
-                        # --read----
-                        # ???edge??? => e_s, e_e = [2, 6)
-                        # left_hanging = max(0, 3-2) = 1
-                        # right_hanging = max(0, 6-3-4) = 0
-                        # s_s = left_hanging = 1
-                        # s_e = 4-right_hanging = 4-0 = 4
-                        # e_s = max(0, 2-3) = 0
-                        # e_e = max(4, 6-2*3) = 4
-
-                        # 0123456789
-                        # ----read--
-                        # ???edge??? => e_s, e_e = [4, 8)
-                        # left_hanging = max(0, 3-4) = 0
-                        # right_hanging = max(0, 8-3-4) = 1
-                        # s_s = 0
-                        # s_e = 4-1 = 3
-                        # e_s = max(0, 4-3) = 1
-                        # e_e = max(4, 8-2*3) = 4 !!!!!!!
-
-                        left_hanging = max(0, neutral_run_len-e_st)
-                        right_hanging = \
-                            max(0, e_en-neutral_run_len-len(edge_string))
-                        s_st, s_en = left_hanging, monolen - right_hanging
-                        e_st = max(0, e_st-neutral_run_len)
-                        e_en = e_st + s_en - s_st
-                        assert 0 <= e_st < e_en <= len(edge_string)
-                        assert 0 <= s_st < s_en <= monolen
-                        for c1, c2 in zip(monostring[s_st:s_en],
-                                          edge_string[e_st:e_en]):
-                            if c1 != c2:
-                                assert c1 in neutral_symbs or \
-                                    c2 in neutral_symbs
-                        overlap = Overlap(edge=edge,
-                                          s_st=s_st,
-                                          s_en=s_en,
-                                          e_st=e_st,
-                                          e_en=e_en)
-                        overlaps[s_id].append(overlap)
-                overlaps[s_id].sort(key=lambda overlap: overlap.s_en)
-            return overlaps
-
-        def get_string_chains(string_overlaps):
-            chains = []
-            for overlap in string_overlaps:
-                overlap_len = overlap.e_en - overlap.e_st
-                best_length = overlap_len
-                best_chains = [Chain(overlap_list=[overlap],
-                                     length=best_length)]
-                v2, w, _ = overlap.edge
-                for chain in chains:
-                    last_overlap = chain.overlap_list[-1]
-
-                    u, v1, _ = last_overlap.edge
-                    if v1 != v2:
-                        continue
-
-                    v = v1
-                    v_label = self.nodeindex2label[v]
-                    v_len = len(v_label)  # for de Bruijn graph v_len == k
-
-                    if last_overlap.s_en - v_len + overlap_len != overlap.s_en:
-                        continue
-
-                    new_length = chain.length - v_len + overlap_len
-                    new_overlap_list = chain.overlap_list.copy()
-                    new_overlap_list.append(overlap)
-                    new_chain = Chain(overlap_list=new_overlap_list,
-                                      length=new_length)
-                    if new_length > best_length:
-                        best_length = new_length
-                        best_chains = [new_chain]
-                    elif new_length == best_length:
-                        best_chains.append(new_chain)
-                chains += best_chains
-
-            chains.sort(key=lambda chain: chain.length,
-                        reverse=True)
-            accepted_chains = []
-            for chain in chains:
-                ch_st = chain.overlap_list[0].s_st
-                ch_en = chain.overlap_list[-1].s_en
-                overlaps_with_longer = False
-                for accepted_chain in accepted_chains:
-                    if accepted_chain.length == chain.length:
-                        continue
-                    a_ch_st = accepted_chain.overlap_list[0].s_st
-                    a_ch_en = accepted_chain.overlap_list[-1].s_en
-                    if ch_st <= a_ch_st < ch_en or \
-                            ch_st < a_ch_en <= ch_en:
-                        overlaps_with_longer = True
-                        break
-                if not overlaps_with_longer:
-                    accepted_chains.append(chain)
-            return accepted_chains
-
-        def get_chains(overlaps):
-            chains = {}
-            for i, (s_id, string_overlaps) in enumerate(overlaps.items()):
-                chains[s_id] = get_string_chains(overlaps[s_id])
-            return chains
+                    outdir=None,
+                    n_threads=config['common']['threads']):
 
         logger.info('Mapping monostrings to graph')
         logger.info('Computing overlaps')
-        Overlap = namedtuple('Overlap', ['edge',
-                                         's_st', 's_en',
-                                         'e_st', 'e_en'])
-        overlaps = find_overlaps()
+        overlaps = find_overlaps(graph=self,
+                                 string_set=string_set,
+                                 overlap_penalty=overlap_penalty,
+                                 neutral_symbs=neutral_symbs,
+                                 n_threads=n_threads)
 
         logger.info('Computing chains')
-        Chain = namedtuple('Chain', ['overlap_list', 'length'])
-        chains = get_chains(overlaps)
+        chains = get_chains(graph=self, overlaps=overlaps, n_threads=n_threads)
 
         unmapped = {s_id for s_id, s_chains in chains.items()
                     if len(s_chains) == 0}

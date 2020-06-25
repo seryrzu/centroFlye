@@ -85,6 +85,9 @@ class MonoStringSet:
     def __getitem__(self, sub):
         return self.monostrings[sub]
 
+    def __len__(self):
+        return len(self.monostrings)
+
     def classify_monomerinstances(self, only_reliable=True):
         monoindexes = self.monomer_db.get_monoindexes()
         all_monomerinstances_dict = \
