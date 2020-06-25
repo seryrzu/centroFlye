@@ -109,11 +109,11 @@ class centroFlye:
                                    mode=params.mode)
         db = dbs[config['idb']['maxk']]
         path_db_outdir = os.path.join(params.outdir, 'path_db')
-        path_db = PathDeBruijnGraph.from_db(db=db,
-                                            string_set=monoread_set,
-                                            assembly=monoassembly,
-                                            k=config['path_db']['k'],
-                                            outdir=path_db_outdir)
+        path_db = PathDeBruijnGraph.from_mono_db(db=db,
+                                                 monostring_set=monoread_set,
+                                                 assembly=monoassembly,
+                                                 k=config['path_db']['k'],
+                                                 outdir=path_db_outdir)
         scaffolding_outdir = os.path.join(params.outdir, 'scaffolding')
         monoscaffolds2scaffolds(path_db, sd_report.monostring_set,
                                 outdir=scaffolding_outdir)

@@ -129,7 +129,9 @@ class SequenceGraph(ABC):
         self._assert_nx_graph_validity()
         # self.index_edges()
 
-    def get_path(self, list_edges):
+    def get_path(self, list_edges, e_st=None, e_en=None):
+        assert (e_st is None) == (e_en is None)
+
         for e1, e2 in zip(list_edges[:-1], list_edges[1:]):
             assert e1[1] == e2[0]
 
@@ -152,6 +154,17 @@ class SequenceGraph(ABC):
         if fst_node == lst_node:
             len_node = len(self.nodeindex2label[fst_node])
             path = path[:-len_node]
+
+        if e_st is not None:
+            last_edge = list_edges[-1]
+            last_edge_data = self.nx_graph.get_edge_data(*last_edge)
+            last_edge_string = last_edge_data[self.string]
+            last_edge_len = len(last_edge_string)
+            if e_en == last_edge_len:
+                path = path[e_st:]
+            else:
+                path = path[e_st:-(last_edge_len-e_en)]
+
         return tuple(path)
 
     def index_edges(self):
@@ -269,11 +282,13 @@ class SequenceGraph(ABC):
             if len(neutral_symbs) == 0:
                 neutral_symbs = set(['?'])
 
-            monomer_db = fst_iterable(string_set.values()).monomer_db
-            size = monomer_db.get_size()
+            alphabet = set()
+            for string in string_set.values():
+                alphabet |= set(string)
             addEq = []
             for neutral_symb in neutral_symbs:
-                addEq += [(neutral_symb, i) for i in range(size)]
+                addEq += [(neutral_symb, c) for c in alphabet]
+            logger.info(f'Additional equalities = {addEq}')
 
             overlaps = defaultdict(list)
             neutral_symb = fst_iterable(neutral_symbs)
