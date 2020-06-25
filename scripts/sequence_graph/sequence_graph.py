@@ -278,10 +278,21 @@ class SequenceGraph(ABC):
     def map_strings(self, string_set, overlap_penalty, neutral_symbs,
                     only_unique_paths=False,
                     outdir=None,
-                    n_threads=config['common']['threads']):
+                    n_threads=config['common']['threads'],
+                    min_len=None):
 
         logger.info('Mapping monostrings to graph')
         logger.info('Computing overlaps')
+        if min_len is None:
+            logger.info('No min len parameter. All strings will be aligned')
+        else:
+            logger.info(f'Only strings longer than {min_len} will be aligned')
+            total_reads = len(string_set)
+            string_set = {s_id: string for s_id, string in string_set.items()
+                          if len(string) >= min_len}
+            long_reads = len(string_set)
+            logger.info(f'{long_reads} / {total_reads} longer than {min_len}')
+
         overlaps = find_overlaps(graph=self,
                                  string_set=string_set,
                                  overlap_penalty=overlap_penalty,

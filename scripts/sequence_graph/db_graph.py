@@ -250,10 +250,15 @@ class DeBruijnGraph(SequenceGraph):
     def map_strings(self, string_set, neutral_symbs,
                     only_unique_paths=False,
                     outdir=None,
-                    n_threads=config['common']['threads']):
+                    n_threads=config['common']['threads'],
+                    min_len=None):
+        if min_len is None:
+            logger.info(f'For De Bruijn graph aligning min_len = k = {self.k}')
+            min_len = self.k
         return super().map_strings(string_set=string_set,
                                    overlap_penalty=self.k,
                                    neutral_symbs=neutral_symbs,
                                    only_unique_paths=only_unique_paths,
                                    outdir=outdir,
-                                   n_threads=n_threads)
+                                   n_threads=n_threads,
+                                   min_len=min_len)
