@@ -91,7 +91,7 @@ def get_idb(string_set,
 
             dot_compact_file = os.path.join(outdir, f'db_k{k}_compact.dot')
             db.write_dot(outfile=dot_compact_file,
-                         export_pdf=(k == maxk),
+                         export_pdf=True,
                          compact=True)
             pickle_file = os.path.join(outdir, f'db_k{k}.pickle')
             db.pickle_dump(pickle_file)
