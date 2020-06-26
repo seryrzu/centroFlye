@@ -172,18 +172,19 @@ def scaffolding(db, paths,
 
 def map_monoreads2scaffolds(monoreads, scaffolds,
                             max_nloc=config['polishing']['max_nloc'],
-                            gap_symb_matching=True):
+                            gap_symb_matching=True,
+                            max_dist=0):
     def map_monoread2scaffold(monoread, scaffold, add_matches):
         if gap_symb_matching:
-            size = monoread.monomer_db.get_size()
-            add_matches = [(monoread.gap_symb, i) for i in range(size)]
+            alphabet = set(monoread)
+            add_matches = [(monoread.gap_symb, c) for c in alphabet]
         else:
             add_matches = None
         align = edlib.align(monoread,
                             scaffold,
                             mode='HW',
                             task='path',
-                            k=0,
+                            k=max_dist,
                             additionalEqualities=add_matches)
         locs = align['locations']
         return locs

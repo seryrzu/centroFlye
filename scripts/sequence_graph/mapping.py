@@ -52,6 +52,7 @@ def _find_string_overlaps(string,
             # s_s = left_hanging = 1
             # s_e = 4-right_hanging = 4-0 = 4
             # e_s = max(0, 2-3) = 0
+            # e_e = 6-3-0=3
 
             # 0123456789
             # ----read--
@@ -61,13 +62,15 @@ def _find_string_overlaps(string,
             # s_s = 0
             # s_e = 4-1 = 3
             # e_s = max(0, 4-3) = 1
+            # e_e = 8-3-1=4
 
             left_hanging = max(0, neutral_run_len-e_st)
             right_hanging = \
                 max(0, e_en-neutral_run_len-len(edge_string))
             s_st, s_en = left_hanging, monolen - right_hanging
             e_st = max(0, e_st-neutral_run_len)
-            e_en = e_st + s_en - s_st
+            e_en = e_en - neutral_run_len - right_hanging
+            assert e_en == e_st + s_en - s_st
             assert 0 <= e_st < e_en <= len(edge_string)
             assert 0 <= s_st < s_en <= monolen
             for c1, c2 in zip(string[s_st:s_en],
@@ -87,19 +90,26 @@ def _find_strings_chunk_overlaps(strings_chunk,
                                  neutral_symbs,
                                  overlap_penalty,
                                  edges,
-                                 addEq):
+                                 addEq,
+                                 max_n_overlaps=config['mapping']['max_n_overlaps']):
     overlaps = {}
+    excessive_overlaps = {}
     for s_id, string in strings_chunk.items():
-        overlaps[s_id] = _find_string_overlaps(string=string,
-                                               neutral_symbs=neutral_symbs,
-                                               overlap_penalty=overlap_penalty,
-                                               edges=edges,
-                                               addEq=addEq)
-    return overlaps
+        s_overlaps = _find_string_overlaps(string=string,
+                                           neutral_symbs=neutral_symbs,
+                                           overlap_penalty=overlap_penalty,
+                                           edges=edges,
+                                           addEq=addEq)
+        if len(s_overlaps) > max_n_overlaps:
+            excessive_overlaps[s_id] = s_overlaps
+        else:
+            overlaps[s_id] = s_overlaps
+    return overlaps, excessive_overlaps
 
 
 def find_overlaps(graph, string_set, overlap_penalty, neutral_symbs,
-                  n_threads=config['common']['threads']):
+                  n_threads=config['common']['threads'],
+                  max_n_overlaps=config['mapping']['max_n_overlaps']):
 
     if len(neutral_symbs) == 0:
         neutral_symbs = set(['?'])
@@ -126,13 +136,16 @@ def find_overlaps(graph, string_set, overlap_penalty, neutral_symbs,
                                               neutral_symbs=neutral_symbs,
                                               overlap_penalty=overlap_penalty,
                                               edges=edges,
-                                              addEq=addEq)
+                                              addEq=addEq,
+                                              max_n_overlaps=max_n_overlaps)
             for strings_chunk in strings_chunks
         )
     overlaps = {}
-    for overlaps_chunk in overlaps_chunks:
+    excessive_overlaps = {}
+    for overlaps_chunk, excessive_overlaps_chunk in overlaps_chunks:
         overlaps.update(overlaps_chunk)
-    return overlaps
+        excessive_overlaps.update(excessive_overlaps_chunk)
+    return overlaps, excessive_overlaps
 
 
 def _get_string_chains(nodeindex2label, string_overlaps):

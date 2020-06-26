@@ -12,8 +12,9 @@ logger = logging.getLogger("centroFlye.sequence_graph.path_graph")
 
 
 class PathDeBruijnGraph(DeBruijnGraph):
-    def __init__(self, raw_pathdb):
+    def __init__(self, raw_pathdb, paths):
         self.__dict__.update(raw_pathdb.__dict__)
+        self.paths = paths
 
     @classmethod
     def from_db(cls, db, string_set, k, neutral_symbs=None,
@@ -31,7 +32,7 @@ class PathDeBruijnGraph(DeBruijnGraph):
         raw_pathdb, _ = get_db(paths, k, outdir,
                                assembly=assembly,
                                mode='assembly')
-        pathdb = cls(raw_pathdb)
+        pathdb = cls(raw_pathdb, paths)
         return pathdb
 
     @classmethod

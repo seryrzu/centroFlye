@@ -293,11 +293,12 @@ class SequenceGraph(ABC):
             long_reads = len(string_set)
             logger.info(f'{long_reads} / {total_reads} longer than {min_len}')
 
-        overlaps = find_overlaps(graph=self,
-                                 string_set=string_set,
-                                 overlap_penalty=overlap_penalty,
-                                 neutral_symbs=neutral_symbs,
-                                 n_threads=n_threads)
+        overlaps, excessive_overlaps = \
+            find_overlaps(graph=self,
+                          string_set=string_set,
+                          overlap_penalty=overlap_penalty,
+                          neutral_symbs=neutral_symbs,
+                          n_threads=n_threads)
 
         logger.info('Computing chains')
         chains = get_chains(graph=self, overlaps=overlaps, n_threads=n_threads)
@@ -305,6 +306,8 @@ class SequenceGraph(ABC):
         unmapped = {s_id for s_id, s_chains in chains.items()
                     if len(s_chains) == 0}
         logger.info(f'{len(unmapped)} strings are unmapped')
+        logger.info(f'That includes {len(excessive_overlaps)} reads '
+                    f'with too many overlaps (see config)')
 
         unique_mapping = {s_id for s_id, s_chains in chains.items()
                           if len(s_chains) == 1}
@@ -316,6 +319,11 @@ class SequenceGraph(ABC):
             unmapped_fn = os.path.join(outdir, 'unmapped.txt')
             with open(unmapped_fn, 'w') as f:
                 for s_id in unmapped:
+                    print(s_id, file=f)
+
+            excessive_fn = os.path.join(outdir, 'excessive.txt')
+            with open(excessive_fn, 'w') as f:
+                for s_id in excessive_overlaps:
                     print(s_id, file=f)
 
             chains_fn = os.path.join(outdir, 'chains.txt')
