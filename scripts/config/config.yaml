@@ -2,6 +2,8 @@ binaries:
     SD: './scripts/ext/stringdecomposer/run_decomposer.py'
 common:
     threads: 4
+mapping:
+    max_n_overlaps: 500
 idb:
     mink: 100
     maxk: 300
