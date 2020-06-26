@@ -28,7 +28,9 @@ logger = logging.getLogger("centroFlye.sequence_graph.db_graph_scaffolding")
 def monoscaffolds2scaffolds(db, monoreads, outdir,
                             n_threads=config['common']['threads']):
     logger.info(f'Scaffolding will be output to {outdir}')
-    paths = db.map_strings(monoreads, only_unique_paths=True)
+    gap_symb = fst_iterable(monoreads.values()).gap_symb
+    paths = db.map_strings(monoreads, neutral_symbs=set([gap_symb]),
+                           only_unique_paths=True)
 
     scaffolds, edge_scaffolds = \
         scaffolding(db, paths, outdir=os.path.join(outdir, 'scaffolding'))
