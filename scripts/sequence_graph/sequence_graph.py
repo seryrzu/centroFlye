@@ -323,8 +323,9 @@ class SequenceGraph(ABC):
 
             excessive_fn = os.path.join(outdir, 'excessive.txt')
             with open(excessive_fn, 'w') as f:
-                for s_id in excessive_overlaps:
-                    print(s_id, file=f)
+                print('s_id', '#overlaps', file=f)
+                for s_id, s_overlaps in excessive_overlaps.items():
+                    print(s_id, len(s_overlaps), file=f)
 
             chains_fn = os.path.join(outdir, 'chains.txt')
             with open(chains_fn, 'w') as f:
