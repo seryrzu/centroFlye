@@ -3,7 +3,7 @@ binaries:
 common:
     threads: 4
 mapping:
-    max_n_overlaps: 500
+    max_n_overlaps: 5000
 idb:
     mink: 100
     maxk: 300
