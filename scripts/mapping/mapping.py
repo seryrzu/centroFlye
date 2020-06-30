@@ -2,9 +2,18 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+from collections import Counter
 import logging
+import os
 
 import edlib
+import numpy as np
+
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
+from utils.os_utils import smart_makedirs
 
 logger = logging.getLogger("centroFlye.mapping.mapping")
 
@@ -49,3 +58,60 @@ def map_queries(queries, targets,
                 if len(locs) <= max_nloc_target:
                     all_locations[i][q_id] = locs
     return all_locations
+
+
+def get_coverage(locations, target_len=None, outdir=None, title=None):
+    coverage = Counter()
+    for read_locs in locations.values():
+        for s, e in read_locs:
+            e += 1
+            coverage[s] += 1
+            coverage[e] -= 1
+
+    if target_len is None:
+        target_len = max(coverage) + 1
+    else:
+        assert target_len > max(coverage) + 1
+
+    coverage_list = [0] * target_len
+    for k, cov in coverage.items():
+        coverage_list[k] = coverage[k]
+    coverage = np.cumsum(coverage_list)
+
+
+    if outdir is not None:
+        smart_makedirs(outdir)
+        txt_fn = os.path.join(outdir, 'coverage.txt')
+        with open(txt_fn, 'w') as f:
+            for i in range(len(coverage)):
+                print(i, coverage[i], file=f)
+
+        uncovered_bases = np.where(coverage == 0)[0]
+        uncovered_intervals = []
+        uncovered_intervals.append(uncovered_bases[0])
+        for j, k in zip(uncovered_bases[:-1], uncovered_bases[1:]):
+            if k-j != 1:
+                uncovered_intervals.append(j)
+                uncovered_intervals.append(k)
+        uncovered_intervals.append(uncovered_bases[-1])
+        assert len(uncovered_intervals) % 2 == 0
+        uncovered_intervals = zip(uncovered_intervals[::2],
+                                uncovered_intervals[1::2])
+        uncovered_intervals = list(uncovered_intervals)
+        uncovered_intervals_fn = os.path.join(outdir,
+                                              'uncovered_intervals.txt')
+        with open(uncovered_intervals_fn, 'w') as f:
+            for s, e in uncovered_intervals:
+                print(s, e, file=f)
+
+        for s, e in uncovered_intervals:
+            plt.axvspan(s, e, facecolor='gray', alpha=0.3)
+        plt.plot(coverage)
+        if title is not None:
+            plt.title(title)
+        plt.xlabel('monomers')
+        plt.ylabel('coverage')
+        pdf_fn = os.path.join(outdir, 'coverage.pdf')
+        plt.savefig(pdf_fn, format='pdf')
+
+    return coverage
