@@ -187,7 +187,7 @@ def cover_scaffolds_w_reads(locations, monoreads, scaffolds, outdir=None):
         for s_id, read_locs in locations[s_i].items():
             for st, en in read_locs:
                 monoread = monoreads[s_id]
-                if en - st + 1 != len(monoread):
+                if en - st != len(monoread):
                     continue
                 for i, minst in enumerate(monoread.monoinstances):
                     p = st + i
