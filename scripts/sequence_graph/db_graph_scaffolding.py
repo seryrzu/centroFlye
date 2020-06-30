@@ -189,6 +189,8 @@ def map_monoreads2scaffolds(monoreads, scaffolds,
                             k=max_dist,
                             additionalEqualities=add_matches)
         locs = align['locations']
+        for i, (s, e) in enumerate(locs):
+            locs[i] = (s, e+1)
         return locs
 
     all_locations = {i: {} for i in range(len(scaffolds))}
