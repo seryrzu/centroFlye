@@ -109,6 +109,7 @@ def get_coverage(locations, target_len=None, outdir=None, title=None):
         plt.plot(coverage)
         if title is not None:
             plt.title(title)
+        plt.grid(True)
         plt.xlabel('monomers')
         plt.ylabel('coverage')
         pdf_fn = os.path.join(outdir, 'coverage.pdf')
