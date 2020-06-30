@@ -11,7 +11,7 @@ from mapping.mapping import map_queries, get_coverage
 
 
 def map_monoreads_to_monoassembly(monoreads_set, monoassembly_set,
-                                  outdir=None):
+                                  outdir=None, plot_close=True):
     monoassembly = fst_iterable(monoassembly_set.values())
     raw_monoassembly = monoassembly.raw_monostring
     gap_symb = monoassembly.gap_symb
@@ -42,4 +42,33 @@ def map_monoreads_to_monoassembly(monoreads_set, monoassembly_set,
     get_coverage(locations=locations,
                  target_len=len(raw_monoassembly),
                  outdir=outdir,
-                 title='Coverage of monoassembly with monoreads')
+                 title='Coverage of monoassembly with monoreads',
+                 plot_close=plot_close)
+
+
+def map_paths_to_monoassembly(paths, monoassembly_set, outdir=None,
+                              plot_close=True):
+    monoassembly = fst_iterable(monoassembly_set.values())
+    raw_monoassembly = monoassembly.raw_monostring
+    locations = map_queries(queries=paths,
+                            targets=[raw_monoassembly],
+                            max_nloc_target=1,
+                            max_ntarget_locs=1,
+                            neutral_symbs=None,
+                            max_dist=0)
+    locations = locations[0]
+
+    smart_makedirs(outdir)
+    locations_fn = os.path.join(outdir, 'locations.tsv')
+    with open(locations_fn, 'w') as f:
+        print(f'path_id\tmono_st\tmono_en', file=f)
+        for r_id, loc in locations.items():
+            assert len(loc) == 1
+            s, e = loc[0]
+            print(f'{r_id}\t{s}\t{e}', file=f)
+
+    get_coverage(locations=locations,
+                 target_len=len(raw_monoassembly),
+                 outdir=outdir,
+                 title='Coverage of monoassembly with paths',
+                 plot_close=plot_close)

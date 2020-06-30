@@ -13,7 +13,8 @@ sys.path.append(os.path.join(this_dirname, 'scripts'))
 
 from standard_logger import get_logger
 
-from assembly_utils.assembly_utils import map_monoreads_to_monoassembly
+from assembly_utils.assembly_utils import map_monoreads_to_monoassembly, \
+    map_paths_to_monoassembly
 from config.config import config, copy_config
 from sd_parser.sd_parser import SD_Report, run_SD
 from sequence_graph.db_graph_scaffolding import monoscaffolds2scaffolds
@@ -123,6 +124,13 @@ class centroFlye:
                                                  assembly=monoassembly,
                                                  k=config['path_db']['k'],
                                                  outdir=path_db_outdir)
+        if params.assembly is not None:
+            paths2assembly_dir = os.path.join(assembly_stats_dir,
+                                              'paths2monoassembly')
+            map_paths_to_monoassembly(paths=path_db.paths,
+                                      monoassembly_set=monoassembly,
+                                      outdir=paths2assembly_dir)
+
         scaffolding_outdir = os.path.join(params.outdir, 'scaffolding')
         monoscaffolds2scaffolds(path_db, sd_report.monostring_set,
                                 outdir=scaffolding_outdir)

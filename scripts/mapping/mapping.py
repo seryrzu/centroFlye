@@ -60,7 +60,8 @@ def map_queries(queries, targets,
     return all_locations
 
 
-def get_coverage(locations, target_len=None, outdir=None, title=None):
+def get_coverage(locations, target_len=None, outdir=None, title=None,
+                 plot_close=True):
     coverage = Counter()
     for read_locs in locations.values():
         for s, e in read_locs:
@@ -114,5 +115,7 @@ def get_coverage(locations, target_len=None, outdir=None, title=None):
         plt.ylabel('coverage')
         pdf_fn = os.path.join(outdir, 'coverage.pdf')
         plt.savefig(pdf_fn, format='pdf')
+        if plot_close:
+            plt.close()
 
     return coverage
