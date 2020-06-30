@@ -18,6 +18,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 from config.config import config
+from mapping.mapping import map_queries
 from utils.bio import read_bio_seq, write_bio_seqs
 from utils.os_utils import smart_makedirs
 from utils.various import fst_iterable
@@ -34,7 +35,11 @@ def monoscaffolds2scaffolds(db, monoreads, outdir,
 
     scaffolds, edge_scaffolds = \
         scaffolding(db, paths, outdir=os.path.join(outdir, 'scaffolding'))
-    locations = map_monoreads2scaffolds(monoreads, scaffolds)
+    locations = map_queries(monoreads, scaffolds,
+                            max_nloc_target=config['polishing']['max_nloc'],
+                            max_ntarget_locs=1,
+                            neutral_symbs=set(gap_symb),
+                            max_dist=0)
     covered_scaffolds = \
         cover_scaffolds_w_reads(locations, monoreads, scaffolds,
                                 outdir=os.path.join(outdir, 'coverage'))
@@ -170,42 +175,6 @@ def scaffolding(db, paths,
 
     scaffolds = get_sequence_scaffolds(edge_scaffolds)
     return scaffolds, edge_scaffolds
-
-
-def map_monoreads2scaffolds(monoreads, scaffolds,
-                            max_nloc=config['polishing']['max_nloc'],
-                            gap_symb_matching=True,
-                            max_dist=0):
-    def map_monoread2scaffold(monoread, scaffold, add_matches):
-        if gap_symb_matching:
-            alphabet = set(monoread)
-            add_matches = [(monoread.gap_symb, c) for c in alphabet]
-        else:
-            add_matches = None
-        align = edlib.align(monoread,
-                            scaffold,
-                            mode='HW',
-                            task='path',
-                            k=max_dist,
-                            additionalEqualities=add_matches)
-        locs = align['locations']
-        for i, (s, e) in enumerate(locs):
-            locs[i] = (s, e+1)
-        return locs
-
-    all_locations = {i: {} for i in range(len(scaffolds))}
-    for s_id, monoread in monoreads.items():
-        seq_locs = {}
-        for i, scaffold in enumerate(scaffolds):
-            locs = map_monoread2scaffold(monoread, scaffold, gap_symb_matching)
-            if len(locs) > 0:
-                seq_locs[i] = locs
-        if len(seq_locs) == 1:
-            i, locs = fst_iterable(seq_locs.items())
-            assert len(locs) > 0
-            if len(locs) <= max_nloc:
-                all_locations[i][s_id] = locs
-    return all_locations
 
 
 def cover_scaffolds_w_reads(locations, monoreads, scaffolds, outdir=None):
