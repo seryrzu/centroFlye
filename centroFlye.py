@@ -13,6 +13,7 @@ sys.path.append(os.path.join(this_dirname, 'scripts'))
 
 from standard_logger import get_logger
 
+from assembly_utils.assembly_utils import map_monoreads_to_monoassembly
 from config.config import config, copy_config
 from sd_parser.sd_parser import SD_Report, run_SD
 from sequence_graph.db_graph_scaffolding import monoscaffolds2scaffolds
@@ -82,7 +83,7 @@ class centroFlye:
                               monomers_fn=params.monomers,
                               sequences_fn=params.reads,
                               mode=params.mode)
-        monoread_set = sd_report.monostring_set
+        monoreads_set = sd_report.monostring_set
 
         if params.assembly is not None:
             assembly_sd_report_outdir = os.path.join(params.outdir,
@@ -95,13 +96,21 @@ class centroFlye:
                                            monomers_fn=params.monomers,
                                            sequences_fn=params.assembly,
                                            mode='assembly')
+            assembly_stats_dir = os.path.join(params.outdir, 'assembly_stats')
             monoassembly = assembly_sd_report.monostring_set
+
+            reads2assembly_dir = os.path.join(assembly_stats_dir,
+                                              'monoreads2monoassembly')
+            map_monoreads_to_monoassembly(monoreads_set=monoreads_set,
+                                          monoassembly_set=monoassembly,
+                                          outdir=reads2assembly_dir)
+
         else:
             monoassembly = None
 
         idb_outdir = os.path.join(params.outdir, 'idb')
         dbs, all_frequent_kmers = \
-            get_idb_monostring_set(string_set=monoread_set,
+            get_idb_monostring_set(string_set=monoreads_set,
                                    mink=config['idb']['mink'],
                                    maxk=config['idb']['maxk'],
                                    assembly=monoassembly,
@@ -110,7 +119,7 @@ class centroFlye:
         db = dbs[config['idb']['maxk']]
         path_db_outdir = os.path.join(params.outdir, 'path_db')
         path_db = PathDeBruijnGraph.from_mono_db(db=db,
-                                                 monostring_set=monoread_set,
+                                                 monostring_set=monoreads_set,
                                                  assembly=monoassembly,
                                                  k=config['path_db']['k'],
                                                  outdir=path_db_outdir)
