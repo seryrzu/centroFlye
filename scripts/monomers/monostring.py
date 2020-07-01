@@ -77,6 +77,7 @@ class MonoInstance:
     def reverse(self):
         self.nucl_segment = RC(self.nucl_segment)
         self.strand = Strand.switch(self.strand)
+        self.sec_strand = Strand.switch(self.sec_strand)
         # [st; en)
         self.st, self.en = self.seq_len - self.en, self.seq_len - self.st
 
