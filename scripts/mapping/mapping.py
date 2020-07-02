@@ -79,7 +79,6 @@ def get_coverage(locations, target_len=None, outdir=None, title=None,
         coverage_list[k] = coverage[k]
     coverage = np.cumsum(coverage_list)
 
-
     if outdir is not None:
         smart_makedirs(outdir)
         txt_fn = os.path.join(outdir, 'coverage.txt')
@@ -97,7 +96,7 @@ def get_coverage(locations, target_len=None, outdir=None, title=None,
         uncovered_intervals.append(uncovered_bases[-1])
         assert len(uncovered_intervals) % 2 == 0
         uncovered_intervals = zip(uncovered_intervals[::2],
-                                uncovered_intervals[1::2])
+                                  uncovered_intervals[1::2])
         uncovered_intervals = list(uncovered_intervals)
         uncovered_intervals_fn = os.path.join(outdir,
                                               'uncovered_intervals.txt')

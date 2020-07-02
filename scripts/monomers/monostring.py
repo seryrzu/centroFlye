@@ -2,15 +2,16 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+from collections import Counter
+from config.config import config
 from enum import Enum
 from itertools import count
 import logging
 
 import numpy as np
 
-from utils.bio import RC, calc_identity
+from utils.bio import RC
 from utils.kmers import get_kmer_index_seq
-from utils.various import fst_iterable
 
 logger = logging.getLogger("centroFlye.monomers.monostring")
 
@@ -31,6 +32,23 @@ class Strand(Enum):
 class Reliability(Enum):
     RELIABLE = '+'
     UNRELIABLE = '?'
+
+
+def assert_monostring_validity(monostring):
+    string = monostring.raw_monostring
+    monomer_db = monostring.monomer_db
+    monomer_db_size = monomer_db.get_size()
+    monoinsts = monostring.monoinstances
+    for i, monoinstance in enumerate(monoinsts):
+        mono_index = monoinstance.get_monoindex()
+        if monoinstance.strand == Strand.REVERSE:
+            mono_index += monomer_db_size
+        if monoinstance.reliability == Reliability.RELIABLE:
+            assert mono_index == string[i]
+
+    nucl_sequence = monostring.nucl_sequence
+    for mi in monoinsts:
+        assert nucl_sequence[mi.st:mi.en] == mi.nucl_segment
 
 
 class MonoInstance:
@@ -102,7 +120,7 @@ class MonoString:
 
     @classmethod
     def from_sd_record(cls, seq_id, monomer_db, sd_record, nucl_sequence,
-                       min_ident_diff=0.0, max_ident_for_diff=1):
+                       min_ident_diff=config['sd_report_parsing']['min_ident_diff']):
         def get_monoinstances(sd_record):
             def id2index_strand(monomer_id, monomer_db=monomer_db):
                 if monomer_id == cls.none_monomer:
@@ -124,9 +142,7 @@ class MonoString:
                                                      identities,
                                                      sec_identities):
                     reliability = Reliability(raw_rel)
-                    # reliability below is currently disabled
-                    if abs(ident - sec_ident) < min_ident_diff \
-                            and sec_ident > max_ident_for_diff:
+                    if abs(ident - sec_ident) < min_ident_diff:
                         reliability = Reliability.UNRELIABLE
                     reliabilities.append(reliability)
                 return reliabilities
@@ -165,6 +181,7 @@ class MonoString:
                 if sec_mono_index is not None:
                     sec_monomer = monomer_db.monomers[sec_mono_index]
                 nucl_segment = nucl_sequence[st:en]
+
                 monoinstance = MonoInstance(monomer=monomer,
                                             sec_monomer=sec_monomer,
                                             strand=strand,
@@ -297,19 +314,3 @@ class MonoString:
         for mi in self.monoinstances:
             identities.append(mi.identity)
         return identities
-
-def assert_monostring_validity(monostring):
-    string = monostring.raw_monostring
-    monomer_db = monostring.monomer_db
-    monomer_db_size = monomer_db.get_size()
-    monoinsts = monostring.monoinstances
-    for i, monoinstance in enumerate(monoinsts):
-        mono_index = monoinstance.get_monoindex()
-        if monoinstance.strand == Strand.REVERSE:
-            mono_index += monomer_db_size
-        if monoinstance.reliability == Reliability.RELIABLE:
-            assert mono_index == string[i]
-
-    nucl_sequence = monostring.nucl_sequence
-    for mi in monoinsts:
-        assert nucl_sequence[mi.st:mi.en] == mi.nucl_segment
