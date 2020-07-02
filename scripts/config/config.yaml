@@ -8,7 +8,7 @@ idb:
     mink: 100
     maxk: 300
 sd_report_parsing:
-    min_ident_diff: 0.01
+    min_ident_diff: 0.015
 scaffolding:
     min_connections: 1
 path_db:
