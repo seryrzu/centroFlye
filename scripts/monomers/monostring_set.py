@@ -179,4 +179,4 @@ class MonoStringSet:
                         readpos_to_change.add((s_id, s+i, str2[d]))
                         assert self.monostrings[s_id][s+i] == str1[d]
         for s_id, p, mono_index in readpos_to_change:
-            self.monostrings[s_id][p] = mono_indetx
+            self.monostrings[s_id][p] = mono_index
