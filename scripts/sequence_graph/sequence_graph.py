@@ -61,7 +61,7 @@ class SequenceGraph(ABC):
 
     @classmethod
     @abstractmethod
-    def _generate_label(par_dict):
+    def _generate_label(cls, par_dict):
         pass
 
     @abstractmethod
