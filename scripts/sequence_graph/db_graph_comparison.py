@@ -19,7 +19,8 @@ class DeBruijnGraphComparison(SequenceGraph):
     cov_asm2 = 'cov_asm2'
     col_asm1 = 'blue'
     col_asm2 = 'red'
-    col_both = 'green'
+    col_both_samecov = 'green'
+    col_both_diffcov = 'orange'
 
     def __init__(self, nx_graph, nodeindex2label, nodelabel2index, k,
                  name_asm1, name_asm2,
@@ -106,10 +107,13 @@ class DeBruijnGraphComparison(SequenceGraph):
         nodelabel2index = {}
 
         for kmer in kmers_both:
+            cov_asm1 = kmers_cnt1[kmer]
+            cov_asm2 = kmers_cnt2[kmer]
+            color = cls.col_both_samecov if cov_asm1 == cov_asm2 else cls.col_both_diffcov
             add_kmer(kmer=kmer,
-                     cov_asm1=kmers_cnt1[kmer],
-                     cov_asm2=kmers_cnt2[kmer],
-                     color=cls.col_both)
+                     cov_asm1=cov_asm1,
+                     cov_asm2=cov_asm2,
+                     color=color)
         for kmer in kmers1:
             add_kmer(kmer=kmer,
                      cov_asm1=kmers_cnt1[kmer],
