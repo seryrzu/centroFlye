@@ -1,20 +1,20 @@
 # centroFlye
 
-**Disclaimer:** To replicate the assemblies from the Nature Biotechnology paper (see `Publications`), please consider branch `cF_NatBiotech_paper_Xv0.8.3-6v0.1.3`.
-The version of centroFlye (and the corresponding assemblies) in `master` branch will be more recent.
 
+**Disclaimer:** To replicate the assemblies from the Nature Biotechnology paper (see `Publications`), please consider branch `cF_NatBiotech_paper_Xv0.8.3-6v0.1.3`.
+The version of centroFlye (and the corresponding assemblies) in `master` branch can be more recent.
 
 ### Version 0.8.3 cenX + 0.1.3 cen6
 ## Overview
-centroFlye (Bzikadze et al., 2019) is an algorithm for centromere assembly using long error-prone reads.
+centroFlye (Bzikadze et al., 2020) is an algorithm for centromere assembly using long error-prone reads.
 Currently it supports assembly of a human centromere 6 (referred to as cen6) and X (referred to as cenX).
 Here we show how to apply it for the cen6 and cenX of the CHM13hTERT human cell line.
-The comparison of various cenX assemblies can be found in Bzikadze et al., 2019 and Mikheenko et al., 2019.
+The comparison of various cenX assemblies can be found in Bzikadze et al., 2020 and Mikheenko et al., 2020.
 
-## Cloning
-Please clone this repo with submodules:
+# Cloning
+Please, clone the repository with submodules:
 ```
-git clone --recurse-submodules git@github.com:seryrzu/centroFlye.git
+git clone --recurse-submodules --single-branch --branch cF_NatBiotech_paper_Xv0.8.3-6v0.1.3 git@github.com:seryrzu/centroFlye.git
 ```
 
 ## Dependencies
@@ -22,24 +22,35 @@ git clone --recurse-submodules git@github.com:seryrzu/centroFlye.git
 + C++ 14
 + Python 3.6
 
-### Python packages (preferably latest versions):
-+ [Biopython](https://pypi.org/project/biopython/)
-+ [Edlib](https://pypi.org/project/edlib/)
-+ [Networkx](https://pypi.org/project/networkx/)
-+ [Numpy](https://pypi.org/project/numpy/)
-+ [Regex](https://pypi.org/project/regex/)
+### Python packages:
++ [biopython](https://pypi.org/project/biopython/) (tested on version 1.70)
++ [click](https://pypi.org/project/click/) (tested on version 7.0)
++ [joblib](https://pypi.org/project/joblib/) (tested on version 0.14.1)
++ [matplotlib](https://pypi.org/project/matplotlib/) (tested on version 3.0.2)
++ [networkx](https://pypi.org/project/networkx/) (tested on version 2.2)
++ [numpy](https://pypi.org/project/numpy/) (tested on version 1.16.1)
++ [plotly](https://pypi.org/project/plotly/) (tested on version 4.4.1)
++ [pydot](https://pypi.org/project/pydot/) (tested on version 1.4.1)
++ [python-edlib](https://pypi.org/project/edlib/) (tested on version 1.2.4.post1)
++ [python-slugify](https://pypi.org/project/python-slugify/) (tested on version 4.0.0)
++ [regex](https://pypi.org/project/regex/) (tested on version 2.4.104)
+
+Required python packages can be installed through Conda with `conda install --file requirements.txt`.
 
 ### External software
 + [Flye](https://github.com/fenderglass/Flye) (*v2.5*, tested on commit: `315122d2ff58025aa4c38227239f431490b557ac`)
 + [Noise Cancelling Repeat Finder (NCRF)](https://github.com/makovalab-psu/NoiseCancellingRepeatFinder) (Tested on commit : `758206f1689ad1338cf7a841482dbf12548c337a`)
 
-Please note that all external software by default has to be in your `PATH`.
+Please note that all external software has to be in your `PATH`.
+Specifically binaries `flye` and `NCRF` have to be in `PATH`.
 
 ### Data
-+ `<path_to_CHM13>` — path where the T2T ONT reads are located (rel2, Guppy flip-flop 2.3.1, used for cenX assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel2/rel2.fastq.gz); rel3, Guppy flip-flop 3.1.5, is used for cen6 assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel3/rel3.fastq.gz) ; also see [github](https://github.com/nanopore-wgs-consortium/CHM13)). The data is described in Miga, Koren et al., 2019.
++ `<path_to_CHM13>` — path where the T2T ONT reads are located (rel2, Guppy flip-flop 2.3.1, used for cenX assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel2/rel2.fastq.gz); rel3, Guppy flip-flop 3.1.5, is used for cen6 assembly and can be downloaded from [here](https://s3.amazonaws.com/nanopore-human-wgs/chm13/nanopore/rel3/rel3.fastq.gz) ; also see [github](https://github.com/nanopore-wgs-consortium/CHM13)). The data is described in Miga, Koren et al., 2020.
 
 ## Availability
-Final assembly and all intermediate results of the pipeline described below are published at [ZENODO](https://doi.org/10.5281/zenodo.3369553)
+The assemblies produced by the version of centroFlye in this branch are presented in the Nature Biotechnology paper (see `Publications`).
+These assemblies and all intermediate results of the pipeline described below are published at [ZENODO](http://doi.org/10.5281/zenodo.3897531).
+For the latest versions of any assemblies produced by centroFlye please consult the `master` branch.
 
 ## Quick start guide for cenX (centroFlye)
 
@@ -161,9 +172,9 @@ bash scripts/read_recruitment/run_read_recruitment.sh \
 
 ### 2. Running String Decomposer on cen6 reads
 
-We use String Decomposer (SD; Dvorkina et al., 2019) to partition cen6 reads into distinct monomers of D6Z1.
+We use String Decomposer (SD; Dvorkina et al., 2020) to partition cen6 reads into distinct monomers of D6Z1.
 These monomers are supplied in the current repo at ``supplementary_data/D6Z1_monomers.fasta``.
-The result of this step is the report of SD is stored at `results_cen6/string_decomposer_report`
+The result of this step is the report of SD which is stored at `results_cen6/string_decomposer_report`
 
 The following commands take 50 threads
 ```
@@ -198,10 +209,10 @@ python scripts/centroFlyeMono.py \
 
 
 ## Publications
-- Bzikadze A.V., Pevzner P.A. centroFlye: Assembling Centromeres with Long Error-Prone Reads, 2019, *bioRxiv*
-- Dvorkina T., Bzikadze A.V., Pevzner P.A. The String Decomposition Problem and its Applications to Centromere Assembly, 2019, *bioRxiv*
-- Miga, K.H., Koren, S., Rhie, A., Vollger, M.R., Gershman, A., Bzikadze, A., Brooks, S., Howe, E., Porubsky, D., Logsdon, G.A., et al. (2019). Telomere-to-telomere assembly of a complete human X chromosome. *bioRxiv*.
-- Mikheenko, A., Bzikadze, A.V., Gurevich, A., Miga, K.H., and Pevzner, P.A. (2019). TandemMapper and TandemQUAST: mapping long reads and assessing/improving assembly quality in extra-long tandem repeats. *bioRxiv*
+- Bzikadze A.V., Pevzner P.A. centroFlye: Assembling Centromeres with Long Error-Prone Reads, *Nature Biotechnology, in press*, 2020
+- Dvorkina T., Bzikadze A.V., Pevzner P.A. The String Decomposition Problem and its Applications to Centromere Assembly, *Bioinformatics, in press*, 2020
+- Miga, K.H., Koren, S., Rhie, A., Vollger, M.R., Gershman, A., Bzikadze, A., Brooks, S., Howe, E., Porubsky, D., Logsdon, G.A., et al. Telomere-to-telomere assembly of a complete human X chromosome, *Nature, in press*, 2020
+- Mikheenko, A., Bzikadze, A.V., Gurevich, A., Miga, K.H., and Pevzner, P.A. TandemMapper and TandemQUAST: mapping long reads and assessing/improving assembly quality in extra-long tandem repeats, *Bioinformatics, in press*, 2020
 
 
 ## Contacts
