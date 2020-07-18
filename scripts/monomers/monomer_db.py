@@ -18,6 +18,9 @@ class Monomer:
         self.mono_index = mono_index
         self.seq = seq
 
+    def __repr__(self):
+        return f'monomer_id={self.monomer_id}, mono_index={self.mono_index}, seq={self.seq}'
+
 
 class MonomerDB:
     def __init__(self, id2index, index2id, monomers, id2list_coord):

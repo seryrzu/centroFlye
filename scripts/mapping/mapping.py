@@ -72,7 +72,7 @@ def get_coverage(locations, target_len=None, outdir=None, title=None,
     if target_len is None:
         target_len = max(coverage) + 1
     else:
-        assert target_len > max(coverage) + 1
+        target_len = max(target_len, max(coverage) + 1)
 
     coverage_list = [0] * target_len
     for k, cov in coverage.items():

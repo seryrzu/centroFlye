@@ -11,7 +11,7 @@ from mapping.mapping import map_queries, get_coverage
 
 
 def map_monoreads_to_monoassembly(monoreads_set, monoassembly_set,
-                                  outdir=None, plot_close=True):
+                                  outdir=None, plot_close=True, title=None):
     monoassembly = fst_iterable(monoassembly_set.values())
     raw_monoassembly = monoassembly.raw_monostring
     gap_symb = monoassembly.gap_symb
@@ -32,22 +32,25 @@ def map_monoreads_to_monoassembly(monoreads_set, monoassembly_set,
             assert len(loc) == 1
             s, e = loc[0]
             a_nucl_s = monoassembly.monoinstances[s].st
-            a_nucl_e = monoassembly.monoinstances[e].en
+            a_nucl_e = monoassembly.monoinstances[e-1].en
             monoread = monoreads_set[r_id]
             r_nucl_s = monoread.monoinstances[0].st
             r_nucl_e = monoread.monoinstances[-1].en
             print(f'{r_id}\t{s}\t{e}\t{r_nucl_s}\t{r_nucl_e}\t'
                   f'{a_nucl_s}\t{a_nucl_e}', file=f)
 
+    if title is None:
+        title = 'Coverage of monoassembly with monoreads'
     get_coverage(locations=locations,
                  target_len=len(raw_monoassembly),
                  outdir=outdir,
-                 title='Coverage of monoassembly with monoreads',
+                 title=title,
                  plot_close=plot_close)
+    return locations
 
 
 def map_paths_to_monoassembly(paths, monoassembly_set, outdir=None,
-                              plot_close=True):
+                              plot_close=True, title=None):
     monoassembly = fst_iterable(monoassembly_set.values())
     raw_monoassembly = monoassembly.raw_monostring
     locations = map_queries(queries=paths,
@@ -67,8 +70,11 @@ def map_paths_to_monoassembly(paths, monoassembly_set, outdir=None,
             s, e = loc[0]
             print(f'{r_id}\t{s}\t{e}', file=f)
 
+    if title is None:
+        title = 'Coverage of monoassembly with paths'
     get_coverage(locations=locations,
                  target_len=len(raw_monoassembly),
                  outdir=outdir,
-                 title='Coverage of monoassembly with paths',
+                 title=title,
                  plot_close=plot_close)
+    return locations
