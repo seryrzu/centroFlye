@@ -53,7 +53,7 @@ def get_candidates(monoassembly,
     for pos, ident_running_mean in enumerate(identities_running_mean):
         if ident_running_mean < min_moving_identity:
             continue
-        mi = monoassembly.monoinstances[ident_mov_av_len+pos]
+        mi = monoassembly.monoinstances[pos + ident_mov_av_len//2]
         ident_diff = abs(mi.identity - mi.sec_identity)
         if mi.is_reliable() and \
                 mi.sec_identity >= min_sec_ident and \
