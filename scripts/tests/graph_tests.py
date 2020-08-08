@@ -53,7 +53,7 @@ class DBGraphTests(unittest.TestCase):
                              {tuple('ACGT'): (0, 0), tuple('ACGA'): (1, 0),
                               tuple('ACGC'): (2, 0), tuple('CGCC'): (2, 1),
                               tuple('GCCC'): (2, 2), tuple('CCCC'): (3, 0)})
-        mappings = db_graph.map_strings({0: 'ACGCCCCCC'})
+        mappings = db_graph.map_strings({0: 'ACGCCCCCC'}, neutral_symbs=set())
 
     def test_contigs(self):
         kmers = ['TAA', 'GAC', 'TCA', 'AAC', 'ACA', 'CAA']

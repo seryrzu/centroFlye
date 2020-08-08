@@ -43,7 +43,7 @@ def cluster_sequences(sequences, max_ident):
         for s_id2, s2 in sequences.items():
             if s1 <= s2:
                 continue
-            ident = calc_identity(s1, s2)
+            ident, _ = calc_identity(s1, s2)
             identities[(s_id1, s_id2)] = ident
             identities[(s_id2, s_id1)] = ident
             if ident > max_ident:
