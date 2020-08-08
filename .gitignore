@@ -3,3 +3,11 @@
 *.swp
 *.so
 *.DS_Store
+data-share/
+data/
+experiments/
+scripts/ext/nonmono_regions_extractor/
+scripts/jupyters/
+scripts/misc/
+scripts/read_recruitment/rr
+test_dataset/
