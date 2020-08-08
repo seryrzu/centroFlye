@@ -11,7 +11,6 @@ from subprocess import check_call
 import edlib
 from joblib import Parallel, delayed
 import networkx as nx
-from tqdm import tqdm
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -304,8 +303,8 @@ def polish_scaffolds(scaffolds, read_pseudounits, outdir,
                        '-o', pseudounit_outdir]
                 cmd = [str(x) for x in cmd]
                 cmds.append(cmd)
-        Parallel(n_jobs=n_threads)(delayed(check_call)(cmd)
-                                   for cmd in tqdm(cmds))
+        Parallel(n_jobs=n_threads, verbose=50)(delayed(check_call)(cmd)\
+                                               for cmd in cmds)
         polished_scaffold = []
         for j, (s, e, pseudounits) in enumerate(read_pseudounits[i]):
             pseudounit_outdir = os.path.join(scaf_outdir, f'pseudounit_{j}')
