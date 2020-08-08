@@ -9,3 +9,4 @@ pydot=1.4.1
 python-edlib=1.2.4.post1
 python-slugify=4.0.0
 regex=2018.11.22
+seaborn=0.10.1

@@ -34,6 +34,7 @@ git clone --recurse-submodules --single-branch --branch cF_NatBiotech_paper_Xv0.
 + [python-edlib](https://pypi.org/project/edlib/) (tested on version 1.2.4.post1)
 + [python-slugify](https://pypi.org/project/python-slugify/) (tested on version 4.0.0)
 + [regex](https://pypi.org/project/regex/) (tested on version 2.4.104)
++ [seaborn](https://pypi.org/project/seaborn) (tested on version 0.10.1)
 
 Required python packages can be installed through Conda with `conda install --file requirements.txt`.
 
