@@ -6,7 +6,9 @@ networkx=2.2
 numpy=1.16.1
 plotly=4.4.1
 pydot=1.4.1
+pyahocorasick
 python-edlib=1.2.4.post1
 python-slugify=4.0.0
 regex=2018.11.22
 seaborn=0.10.1
+stringdecomposer=0.1.0
