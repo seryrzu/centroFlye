@@ -464,13 +464,15 @@ def hybrid_alignment(r, a, b, mism=-1, match=1, indel=-1):
     return alr, alm, score, sec_score, jump, orient
 
 
-def calc_identity(a, b, mode='NW'):
-    alignment = edlib.align(a, b, task='path', mode=mode)
+def calc_identity(a, b, mode='NW', k=None):
+    alignment = edlib.align(a, b, task='path', mode=mode, k=k)
+    if alignment['editDistance'] == -1:
+        return 0, alignment
     cigar, cigar_stats = parse_cigar(alignment['cigar'])
     alignment_len = sum(cigar_stats.values())
     identity = 1 - alignment['editDistance'] / alignment_len
     assert 0 <= identity <= 1
-    return identity
+    return identity, alignment
 
 
 def group_cuts(s1, s2):
