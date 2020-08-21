@@ -252,7 +252,7 @@ class CentroFlye:
     def run_tandemPolisher(self, assembly_fn):
         polisher_outdir = os.path.join(self.params.outdir, "polishing2")
         polisher_cmd = ["python", "-u", self.tandemPolisher,
-                        "-r", self.params.reads,
+                        "--nano", self.params.reads,
                         "-o", polisher_outdir,
                         "--only-polish",
                         "-t", self.params.threads,
@@ -262,7 +262,7 @@ class CentroFlye:
         print(list2str(polisher_cmd))
         subprocess.call(polisher_cmd)
         polished_assembly_fn = \
-            os.path.join(polisher_outdir, 'polished', 'polished_4.fasta')
+            os.path.join(polisher_outdir, 'polished', f'polished_{self.params.num_polish_iters}.fasta')
         return polished_assembly_fn
 
     def copy_final_assembly(self, polished_assembly_fn):
