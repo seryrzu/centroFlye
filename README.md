@@ -108,6 +108,7 @@ The following command uses 50 threads.
 
 ```
 python centroFlye.py \
+            --coverage 32 \
             --reads results_cenX/centromeric_reads/centromeric_reads.fasta \
             -t 50 \
             --outdir results_cenX \
