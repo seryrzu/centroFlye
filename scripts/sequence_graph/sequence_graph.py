@@ -11,6 +11,7 @@ import pickle
 from subprocess import Popen
 
 import networkx as nx
+import numpy as np
 
 from sequence_graph.mapping import find_overlaps, get_chains
 
@@ -23,6 +24,7 @@ logger = logging.getLogger("centroFlye.sequence_graph.sequence_graph")
 class SequenceGraph(ABC):
     label = 'label'
     color = 'color'
+    edge_index = 'edge_index'
     string = 'string'
     length = 'length'
 
@@ -68,7 +70,8 @@ class SequenceGraph(ABC):
     def _add_edge(self, node, color, string,
                   in_node, out_node,
                   in_data, out_data,
-                  edge_len):
+                  edge_len,
+                  edge_index):
         pass
 
     def _assert_nx_graph_validity(self):
@@ -118,10 +121,13 @@ class SequenceGraph(ABC):
                 string = tuple(string)
                 edge_len = len(string) - len_node
 
+                edge_index = in_data[self.edge_index]
+
                 self._add_edge(node=node, color=color, string=string,
                                in_node=in_node, out_node=out_node,
                                in_data=in_data, out_data=out_data,
-                               edge_len=edge_len)
+                               edge_len=edge_len,
+                               edge_index=edge_index)
 
                 self.nx_graph.remove_node(node)
                 label = self.nodeindex2label[node]

@@ -35,23 +35,30 @@ class DeBruijnGraph3Color(SequenceGraph):
         length = par_dict[cls.length]
         read_cov = par_dict[cls.read_coverage]
         assembly_cov = par_dict[cls.assembly_coverage]
+        edge_index = par_dict[cls.edge_index]
+
+        # TODO add index?
+        # label = f'index={edge_index}\n'
+        label = ''
+
         if read_cov is None:
             mean_assembly_cov = np.mean(assembly_cov)
-            label = f'len={length}\nAssemblyCov={mean_assembly_cov:0.2f}'
+            label += f'len={length}\nAssemblyCov={mean_assembly_cov:0.2f}'
         elif assembly_cov is None:
             mean_read_cov = np.mean(read_cov)
-            label = f'len={length}\nReadCov={mean_read_cov:0.2f}'
+            label += f'len={length}\nReadCov={mean_read_cov:0.2f}'
         else:
             assert read_cov is not None and assembly_cov is not None
             mean_assembly_cov = np.mean(assembly_cov)
             mean_read_cov = np.mean(read_cov)
-            label = f'len={length}\nAssemblyCov={mean_assembly_cov:0.2f}\n'
+            label += f'len={length}\nAssemblyCov={mean_assembly_cov:0.2f}\n'
             label += f'ReadCov={mean_read_cov:0.2f}'
         return label
 
     @classmethod
     def from_db_graphs(cls, gr_assembly, gr_reads, collapse=True):
-        def add_kmer(kmer, read_coverage, assembly_coverage, color):
+        def add_kmer(kmer, read_coverage, assembly_coverage, color,
+                     edge_index):
             prefix, suffix = kmer[:-1], kmer[1:]
 
             if prefix in nodelabel2index:
@@ -76,14 +83,16 @@ class DeBruijnGraph3Color(SequenceGraph):
             label = \
                 cls._generate_label({cls.length: length,
                                      cls.read_coverage: read_coverage,
-                                     cls.assembly_coverage: assembly_coverage})
+                                     cls.assembly_coverage: assembly_coverage,
+                                     cls.edge_index: edge_index})
             nx_graph.add_edge(prefix_node_ind, suffix_node_ind,
                               string=kmer,
                               length=length,
                               read_coverage=read_coverage,
                               assembly_coverage=assembly_coverage,
                               label=label,
-                              color=color)
+                              color=color,
+                              edge_index=edge_index)
 
         kmers_assembly_cov = gr_assembly.get_all_kmers()
         kmers_reads_cov = gr_reads.get_all_kmers()
@@ -97,19 +106,26 @@ class DeBruijnGraph3Color(SequenceGraph):
         nx_graph = nx.MultiDiGraph()
         nodeindex2label = {}
         nodelabel2index = {}
+        edge_index = 0
 
         for kmer in kmers_both:
             add_kmer(kmer, read_coverage=kmers_reads_cov[kmer],
                      assembly_coverage=kmers_assembly_cov[kmer],
-                     color=cls.col_both)
+                     color=cls.col_both,
+                     edge_index=edge_index)
+            edge_index += 1
         for kmer in kmers_reads:
             add_kmer(kmer, read_coverage=kmers_reads_cov[kmer],
                      assembly_coverage=None,
-                     color=cls.col_reads)
+                     color=cls.col_reads,
+                     edge_index=edge_index)
+            edge_index += 1
         for kmer in kmers_assembly:
             add_kmer(kmer, read_coverage=None,
                      assembly_coverage=kmers_assembly_cov[kmer],
-                     color=cls.col_assembly)
+                     color=cls.col_assembly,
+                     edge_index=edge_index)
+            edge_index += 1
 
         k = gr_assembly.k
         assert k == gr_reads.k
@@ -153,7 +169,8 @@ class DeBruijnGraph3Color(SequenceGraph):
     def _add_edge(self, node, color, string,
                   in_node, out_node,
                   in_data, out_data,
-                  edge_len):
+                  edge_len,
+                  edge_index):
         in_read_cov = in_data[self.read_coverage]
         out_read_cov = out_data[self.read_coverage]
 
@@ -178,14 +195,16 @@ class DeBruijnGraph3Color(SequenceGraph):
         label = \
             self._generate_label({self.length: edge_len,
                                   self.read_coverage: read_cov,
-                                  self.assembly_coverage: assembly_cov})
+                                  self.assembly_coverage: assembly_cov,
+                                  self.edge_index: edge_index})
         self.nx_graph.add_edge(in_node, out_node,
                                string=string,
                                length=edge_len,
                                read_coverage=read_cov,
                                assembly_coverage=assembly_cov,
                                label=label,
-                               color=color)
+                               color=color,
+                               edge_index=edge_index)
 
     def get_kmers_on_edges(self, color=None):
         kmer2edge = {}

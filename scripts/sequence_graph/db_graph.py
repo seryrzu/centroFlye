@@ -31,15 +31,38 @@ class DeBruijnGraph(SequenceGraph):
     def _generate_label(cls, par_dict):
         cov = par_dict[cls.coverage]
         length = par_dict[cls.length]
+        edge_index = par_dict[cls.edge_index]
 
         mean_cov = np.mean(cov)
+        # TODO add index?
+        # label = f'index={edge_index}\nlen={length}\ncov={mean_cov:0.2f}'
         label = f'len={length}\ncov={mean_cov:0.2f}'
         return label
+
+    def _add_edge(self, node, color, string,
+                  in_node, out_node,
+                  in_data, out_data,
+                  edge_len,
+                  edge_index):
+        in_cov = in_data[self.coverage]
+        out_cov = out_data[self.coverage]
+        cov = sorted(in_cov + out_cov)
+        assert len(cov) == edge_len
+        label = self._generate_label({self.length: edge_len,
+                                      self.coverage: np.mean(cov),
+                                      self.edge_index: edge_index})
+        self.nx_graph.add_edge(in_node, out_node,
+                               string=string,
+                               coverage=cov,
+                               label=label,
+                               length=edge_len,
+                               color=color,
+                               edge_index=edge_index)
 
     @classmethod
     def from_kmers(cls, kmers, kmer_coverages=None,
                    min_tip_cov=1, collapse=True):
-        def add_kmer(kmer, coverage=1, color='black'):
+        def add_kmer(kmer, edge_index, coverage=1, color='black'):
             prefix, suffix = kmer[:-1], kmer[1:]
 
             if prefix in nodelabel2index:
@@ -59,13 +82,15 @@ class DeBruijnGraph(SequenceGraph):
             length = 1
             coverage = [coverage]
             label = cls._generate_label({cls.length: length,
-                                         cls.coverage: coverage})
+                                         cls.coverage: coverage,
+                                         cls.edge_index: edge_index})
             nx_graph.add_edge(prefix_node_ind, suffix_node_ind,
                               string=kmer,
                               length=length,
                               coverage=coverage,
                               label=label,
-                              color=color)
+                              color=color,
+                              edge_index=edge_index)
 
         def remove_lowcov_tips():
             while True:
@@ -100,11 +125,15 @@ class DeBruijnGraph(SequenceGraph):
         nodeindex2label = {}
         nodelabel2index = {}
         kmers = [tuple(kmer) for kmer in kmers]
+        edge_index = 0
         for kmer in kmers:
             if kmer_coverages is None:
-                add_kmer(kmer)
+                add_kmer(kmer, edge_index=edge_index)
             else:
-                add_kmer(kmer, coverage=kmer_coverages[kmer])
+                add_kmer(kmer,
+                         coverage=kmer_coverages[kmer],
+                         edge_index=edge_index)
+            edge_index += 1
 
         assert len(kmers)
         k = len(kmers[0])
@@ -118,23 +147,6 @@ class DeBruijnGraph(SequenceGraph):
                        k=k,
                        collapse=collapse)
         return db_graph
-
-    def _add_edge(self, node, color, string,
-                  in_node, out_node,
-                  in_data, out_data,
-                  edge_len):
-        in_cov = in_data[self.coverage]
-        out_cov = out_data[self.coverage]
-        cov = sorted(in_cov + out_cov)
-        assert len(cov) == edge_len
-        label = self._generate_label({self.length: edge_len,
-                                      self.coverage: np.mean(cov)})
-        self.nx_graph.add_edge(in_node, out_node,
-                               string=string,
-                               coverage=cov,
-                               label=label,
-                               length=edge_len,
-                               color=color)
 
     def get_complex_nodes(self):
         complex_nodes = []
