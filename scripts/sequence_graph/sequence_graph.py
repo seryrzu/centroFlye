@@ -52,8 +52,11 @@ class SequenceGraph(ABC):
             self._assert_nx_graph_validity()
 
         self.db_index = None
+
         if collapse:
-            self.collapse_nonbranching_paths()
+            self.removed_edge_indexes = self.collapse_nonbranching_paths()
+        else:
+            self.removed_edge_indexes = []
 
     @classmethod
     def from_pickle(cls, fn):
@@ -99,6 +102,7 @@ class SequenceGraph(ABC):
             return in_edge != out_edge and in_edge_color == out_edge_color
 
         nodes = list(self.nx_graph)
+        removed_edge_indexes = []
         for node in nodes:
             if node_on_nonbranching_path(node):
                 in_edge = fst_iterable(self.nx_graph.in_edges(node, keys=True))
@@ -128,6 +132,7 @@ class SequenceGraph(ABC):
                                in_data=in_data, out_data=out_data,
                                edge_len=edge_len,
                                edge_index=edge_index)
+                removed_edge_indexes.append(out_data[self.edge_index])
 
                 self.nx_graph.remove_node(node)
                 label = self.nodeindex2label[node]
@@ -135,7 +140,7 @@ class SequenceGraph(ABC):
                 del self.nodelabel2index[label]
 
         self._assert_nx_graph_validity()
-        # self.index_edges()
+        return removed_edge_indexes
 
     def get_path(self, list_edges, e_st=None, e_en=None):
         assert (e_st is None) == (e_en is None)
