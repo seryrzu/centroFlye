@@ -37,7 +37,7 @@ class DeBruijnGraph(SequenceGraph):
         label = f'index={edge_index}\nlen={length}\ncov={mean_cov:0.2f}'
         return label
 
-    def _add_edge(self, node, color, string,
+    def _add_edge(self, color, string,
                   in_node, out_node,
                   in_data, out_data,
                   edge_len,

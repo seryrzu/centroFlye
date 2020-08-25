@@ -70,7 +70,7 @@ class SequenceGraph(ABC):
         pass
 
     @abstractmethod
-    def _add_edge(self, node, color, string,
+    def _add_edge(self, color, string,
                   in_node, out_node,
                   in_data, out_data,
                   edge_len,
@@ -127,7 +127,7 @@ class SequenceGraph(ABC):
 
                 edge_index = in_data[self.edge_index]
 
-                self._add_edge(node=node, color=color, string=string,
+                self._add_edge(color=color, string=string,
                                in_node=in_node, out_node=out_node,
                                in_data=in_data, out_data=out_data,
                                edge_len=edge_len,

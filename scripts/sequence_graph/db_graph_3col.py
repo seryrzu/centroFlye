@@ -164,7 +164,7 @@ class DeBruijnGraph3Color(SequenceGraph):
             color3graph.pickle_dump(c3g_pickle_file)
         return color3graph
 
-    def _add_edge(self, node, color, string,
+    def _add_edge(self, color, string,
                   in_node, out_node,
                   in_data, out_data,
                   edge_len,
