@@ -120,6 +120,17 @@ def index(lst, sublst):
     return locations
 
 
+def filter_sublsts_n2_dict(dct):
+    # filter substrings from a list (dict) of strings
+    # Quadratic solution. Better solution uses Suffix Arrays
+    res = {}
+    for k, v in dct.items():
+        if not any(k != t and len(index(w, v))
+                   for t, w in dct.items()):
+            res[k] = v
+    return res
+
+
 def running_mean(data, window_size):
     cumsum = np.cumsum(np.insert(data, 0, 0))
     return (cumsum[window_size:] - cumsum[:-window_size]) / window_size
