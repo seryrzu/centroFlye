@@ -37,9 +37,7 @@ class DeBruijnGraph3Color(SequenceGraph):
         assembly_cov = par_dict[cls.assembly_coverage]
         edge_index = par_dict[cls.edge_index]
 
-        # TODO add index?
-        # label = f'index={edge_index}\n'
-        label = ''
+        label = f'index={edge_index}\n'
 
         if read_cov is None:
             mean_assembly_cov = np.mean(assembly_cov)

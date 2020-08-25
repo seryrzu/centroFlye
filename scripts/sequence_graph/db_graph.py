@@ -34,9 +34,7 @@ class DeBruijnGraph(SequenceGraph):
         edge_index = par_dict[cls.edge_index]
 
         mean_cov = np.mean(cov)
-        # TODO add index?
-        # label = f'index={edge_index}\nlen={length}\ncov={mean_cov:0.2f}'
-        label = f'len={length}\ncov={mean_cov:0.2f}'
+        label = f'index={edge_index}\nlen={length}\ncov={mean_cov:0.2f}'
         return label
 
     def _add_edge(self, node, color, string,
