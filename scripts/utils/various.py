@@ -125,7 +125,7 @@ def filter_sublsts_n2_dict(dct):
     # Quadratic solution. Better solution uses Suffix Arrays
     res = {}
     for k, v in dct.items():
-        if not any(k != t and len(index(w, v))
+        if not any(k != t and v != w and len(index(w, v))
                    for t, w in dct.items()):
             res[k] = v
     return res
