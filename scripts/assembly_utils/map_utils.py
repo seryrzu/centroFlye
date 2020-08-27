@@ -23,6 +23,9 @@ def map_monoreads_to_monoassembly(monoreads_set, monoassembly_set,
                             max_dist=0)
     locations = locations[0]
 
+    if outdir is None:
+        return locations
+
     smart_makedirs(outdir)
     locations_fn = os.path.join(outdir, 'locations.tsv')
     with open(locations_fn, 'w') as f:
@@ -60,6 +63,9 @@ def map_paths_to_monoassembly(paths, monoassembly_set, outdir=None,
                             neutral_symbs=None,
                             max_dist=0)
     locations = locations[0]
+
+    if outdir is None:
+        return locations
 
     smart_makedirs(outdir)
     locations_fn = os.path.join(outdir, 'locations.tsv')
