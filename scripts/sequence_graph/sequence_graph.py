@@ -310,6 +310,7 @@ class SequenceGraph(ABC):
                           overlap_penalty=overlap_penalty,
                           neutral_symbs=neutral_symbs,
                           n_threads=n_threads)
+        # print(overlaps)
 
         logger.info('Computing chains')
         chains = get_chains(graph=self, overlaps=overlaps, n_threads=n_threads)
@@ -349,16 +350,17 @@ class SequenceGraph(ABC):
                 for s_id in unique_mapping:
                     print(s_id, file=f)
 
-        if not only_unique_paths:
-            return chains
-
-        paths = {}
-        for r_id in unique_mapping:
-            chain = chains[r_id][0]
-            path = [overlap.edge for overlap in chain.overlap_list]
-            e_st = chain.overlap_list[0].e_st
-            e_en = chain.overlap_list[-1].e_en
-            paths[r_id] = (path, e_st, e_en)
+        paths = defaultdict(list)
+        for r_id, chains_r_id in chains.items():
+            for chain in chains_r_id:
+                path = [overlap.edge for overlap in chain.overlap_list]
+                e_st = chain.overlap_list[0].e_st
+                e_en = chain.overlap_list[-1].e_en
+                paths[r_id].append((path, e_st, e_en))
+        if only_unique_paths:
+            paths = {r_id: paths_r_id[0]
+                     for r_id, paths_r_id in paths.items()
+                     if len(paths_r_id) == 1}
         return paths
 
     def map_strings_fast(self, strings):
