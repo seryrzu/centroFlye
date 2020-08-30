@@ -11,7 +11,8 @@ from mapping.mapping import map_queries, get_coverage
 
 
 def map_monoreads_to_monoassembly(monoreads_set, monoassembly_set,
-                                  outdir=None, plot_close=True, title=None):
+                                  outdir=None, plot_close=True, title=None,
+                                  max_dist=0):
     monoassembly = fst_iterable(monoassembly_set.values())
     raw_monoassembly = monoassembly.raw_monostring
     gap_symb = monoassembly.gap_symb
@@ -20,7 +21,7 @@ def map_monoreads_to_monoassembly(monoreads_set, monoassembly_set,
                             max_nloc_target=1,
                             max_ntarget_locs=1,
                             neutral_symbs=set(gap_symb),
-                            max_dist=0)
+                            max_dist=max_dist)
     locations = locations[0]
 
     if outdir is None:
@@ -53,7 +54,8 @@ def map_monoreads_to_monoassembly(monoreads_set, monoassembly_set,
 
 
 def map_paths_to_monoassembly(paths, monoassembly_set, outdir=None,
-                              plot_close=True, title=None):
+                              plot_close=True, title=None,
+                              max_dist=0):
     monoassembly = fst_iterable(monoassembly_set.values())
     raw_monoassembly = monoassembly.raw_monostring
     locations = map_queries(queries=paths,
@@ -61,7 +63,7 @@ def map_paths_to_monoassembly(paths, monoassembly_set, outdir=None,
                             max_nloc_target=1,
                             max_ntarget_locs=1,
                             neutral_symbs=None,
-                            max_dist=0)
+                            max_dist=max_dist)
     locations = locations[0]
 
     if outdir is None:
