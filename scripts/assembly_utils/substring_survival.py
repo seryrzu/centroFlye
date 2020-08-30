@@ -99,6 +99,7 @@ def find_longest_surviving_substring(mapped_strings, monoassembly_set, outdir,
     plt.savefig(substr_surv_pdf_fn, format='pdf')
     if plot_close:
         plt.close()
+    return substr_surv
 
 
 def find_longest_surviving_substring_paths(paths, monoassembly_set, outdir,
@@ -109,7 +110,7 @@ def find_longest_surviving_substring_paths(paths, monoassembly_set, outdir,
                             max_nloc_target=1, max_ntarget_locs=1,
                             neutral_symbs=None, max_dist=0)[0]
     mapped_paths = {r_id: paths[r_id] for r_id in locations}
-    find_longest_surviving_substring(mapped_strings=mapped_paths,
-                                     monoassembly_set=monoassembly_set,
-                                     outdir=outdir,
-                                     plot_close=True)
+    return find_longest_surviving_substring(mapped_strings=mapped_paths,
+                                            monoassembly_set=monoassembly_set,
+                                            outdir=outdir,
+                                            plot_close=True)
