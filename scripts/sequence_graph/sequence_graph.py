@@ -45,10 +45,14 @@ class SequenceGraph(ABC):
             self.nx_graph = nx.MultiDiGraph()
             self.nodeindex2label = {}
             self.nodelabel2index = {}
+            self.edge_index2edge = {}
         else:
             self.nx_graph = nx_graph
             self.nodeindex2label = nodeindex2label
             self.nodelabel2index = nodelabel2index
+            self.edge_index2edge = \
+                {edge_data[self.edge_index]: (s, e, k)
+                for s, e, k, edge_data in nx_graph.edges(keys=True, data=True)}
             self._assert_nx_graph_validity()
 
         self.db_index = None
@@ -57,6 +61,7 @@ class SequenceGraph(ABC):
             self.removed_edge_indexes = self.collapse_nonbranching_paths()
         else:
             self.removed_edge_indexes = []
+
 
     @classmethod
     def from_pickle(cls, fn):
@@ -85,6 +90,14 @@ class SequenceGraph(ABC):
             assert string[-len(n_label2):] == n_label2
         assert len(self.nx_graph.nodes) == len(self.nodeindex2label)
         assert len(self.nx_graph.nodes) == len(self.nodelabel2index)
+        for s, e, k, data in self.nx_graph.edges(keys=True, data=True):
+            edge_index = data[self.edge_index]
+            assert edge_index in self.edge_index2edge
+            assert (s, e, k) == self.edge_index2edge[edge_index]
+
+        edges = set(self.nx_graph.edges(keys=True))
+        for edge in self.edge_index2edge.values():
+            assert edge in edges
 
     def collapse_nonbranching_paths(self):
         def node_on_nonbranching_path(node):
@@ -138,11 +151,13 @@ class SequenceGraph(ABC):
                 label = self.nodeindex2label[node]
                 del self.nodeindex2label[node]
                 del self.nodelabel2index[label]
+                del self.edge_index2edge[out_data[self.edge_index]]
 
         self._assert_nx_graph_validity()
         return removed_edge_indexes
 
-    def get_path(self, list_edges, e_st=None, e_en=None):
+    def get_path(self, list_edges, e_st=None, e_en=None,
+                 respect_cycled=True):
         assert (e_st is None) == (e_en is None)
 
         for e1, e2 in zip(list_edges[:-1], list_edges[1:]):
@@ -159,6 +174,9 @@ class SequenceGraph(ABC):
             len_node = len(self.nodeindex2label[in_node])
             assert tuple(path[-len_node:]) == edge_string[:len_node]
             path += edge_string[len_node:]
+
+        if not respect_cycled:
+            return tuple(path)
 
         # process cycled path
         fst_node = fst_edge[0]

@@ -195,14 +195,16 @@ class DeBruijnGraph3Color(SequenceGraph):
                                   self.read_coverage: read_cov,
                                   self.assembly_coverage: assembly_cov,
                                   self.edge_index: edge_index})
-        self.nx_graph.add_edge(in_node, out_node,
-                               string=string,
-                               length=edge_len,
-                               read_coverage=read_cov,
-                               assembly_coverage=assembly_cov,
-                               label=label,
-                               color=color,
-                               edge_index=edge_index)
+        key = self.nx_graph.add_edge(in_node, out_node,
+                                     string=string,
+                                     length=edge_len,
+                                     read_coverage=read_cov,
+                                     assembly_coverage=assembly_cov,
+                                     label=label,
+                                     color=color,
+                                     edge_index=edge_index)
+        self.edge_index2edge[edge_index] = (in_node, out_node, key)
+
 
     def get_kmers_on_edges(self, color=None):
         kmer2edge = {}

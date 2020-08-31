@@ -49,13 +49,14 @@ class DeBruijnGraph(SequenceGraph):
         label = self._generate_label({self.length: edge_len,
                                       self.coverage: np.mean(cov),
                                       self.edge_index: edge_index})
-        self.nx_graph.add_edge(in_node, out_node,
-                               string=string,
-                               coverage=cov,
-                               label=label,
-                               length=edge_len,
-                               color=color,
-                               edge_index=edge_index)
+        key = self.nx_graph.add_edge(in_node, out_node,
+                                     string=string,
+                                     coverage=cov,
+                                     label=label,
+                                     length=edge_len,
+                                     color=color,
+                                     edge_index=edge_index)
+        self.edge_index2edge[edge_index] = (in_node, out_node, key)
 
     @classmethod
     def from_kmers(cls, kmers, kmer_coverages=None,
