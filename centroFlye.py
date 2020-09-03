@@ -123,19 +123,19 @@ class centroFlye:
         path_db_outdir = os.path.join(params.outdir, 'path_db')
         path_db = PathDeBruijnGraph.from_mono_db(db=db,
                                                  monostring_set=monoreads_set,
-                                                 assembly=monoassembly,
                                                  k=config['path_db']['k'],
-                                                 outdir=path_db_outdir)
+                                                 outdir=path_db_outdir,
+                                                 assembly=monoassembly)
         if params.assembly is not None:
             paths2assembly_dir = os.path.join(assembly_stats_dir,
                                               'paths2monoassembly')
-            map_paths_to_monoassembly(paths=path_db.paths,
+            map_paths_to_monoassembly(paths=path_db.get_paths(),
                                       monoassembly_set=monoassembly,
                                       outdir=paths2assembly_dir)
             longest_surviving_substring_dir = \
                 os.path.join(assembly_stats_dir, 'longest_surviving_substr')
             find_longest_surviving_substring_paths(
-                paths=path_db.paths,
+                paths=path_db.get_paths(),
                 monoassembly_set=monoassembly,
                 outdir=longest_surviving_substring_dir)
 

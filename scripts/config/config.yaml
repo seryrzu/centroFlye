@@ -12,7 +12,8 @@ sd_report_parsing:
 scaffolding:
     min_connections: 1
 path_db:
-    k: 600
+    k: 800
+    remap_iter: 1000
 polishing:
     n_iter: 4
     min_cov: 3

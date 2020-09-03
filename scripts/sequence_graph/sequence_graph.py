@@ -160,6 +160,9 @@ class SequenceGraph(ABC):
                  respect_cycled=True):
         assert (e_st is None) == (e_en is None)
 
+        if len(list_edges) == 0:
+            return tuple()
+
         for e1, e2 in zip(list_edges[:-1], list_edges[1:]):
             assert e1[1] == e2[0]
 
