@@ -7,6 +7,7 @@ import logging
 
 import numpy as np
 
+from config.config import config
 from monomers.monostring import MonoString
 from sequence_graph.db_graph import DeBruijnGraph
 from utils.kmers import get_kmer_index, def_get_min_mult, \
@@ -52,8 +53,8 @@ class MonoStringSet:
                     max_lowercase = 1
                     max_unreliable = 1
                 else:
-                    max_lowercase = 0.1
-                    max_unreliable = 0.4
+                    max_lowercase = config['monostring_set']['max_lowercase']
+                    max_unreliable = config['monostring_set']['max_unreliable']
             good_monostrings, bad_monostrings = {}, {}
             for seq_id, ms in monostrings.items():
                 if ms.get_perc_lowercase() < max_lowercase and \

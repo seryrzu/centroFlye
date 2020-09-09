@@ -4,6 +4,9 @@ common:
     threads: 4
 mapping:
     max_n_overlaps: 10000
+monostring_set:
+    max_lowercase: 0.4
+    max_unreliable: 0.4
 idb:
     mink: 100
     maxk: 300
