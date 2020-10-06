@@ -21,7 +21,7 @@ from config.config import config, copy_config
 from sd_parser.sd_parser import SD_Report, run_SD
 from sequence_graph.db_graph_scaffolding import monoscaffolds2scaffolds
 from sequence_graph.idb_graph import get_idb_monostring_set
-from sequence_graph.path_graph import PathDeBruijnGraph
+from sequence_graph.path_graph import LightPathDeBruijnGraph
 from utils.git import get_git_revision_short_hash
 from utils.os_utils import expandpath, smart_makedirs
 
@@ -121,21 +121,24 @@ class centroFlye:
                                    mode=params.mode)
         db = dbs[config['idb']['maxk']]
         path_db_outdir = os.path.join(params.outdir, 'path_db')
-        path_db = PathDeBruijnGraph.from_mono_db(db=db,
-                                                 monostring_set=monoreads_set,
-                                                 k=config['path_db']['k'],
-                                                 outdir=path_db_outdir,
-                                                 assembly=monoassembly)
+        path_db = \
+            LightPathDeBruijnGraph.from_mono_db(db=db,
+                                                monostring_set=monoreads_set)
+
+        path_db.increase_k(K=config['path_db']['K'])
+        path_db = path_db.toDB(outdir=path_db_outdir,
+                               assembly=monoassembly)
         if params.assembly is not None:
             paths2assembly_dir = os.path.join(assembly_stats_dir,
                                               'paths2monoassembly')
-            map_paths_to_monoassembly(paths=path_db.get_paths(),
+            paths = path_db.get_paths()
+            map_paths_to_monoassembly(paths=paths,
                                       monoassembly_set=monoassembly,
                                       outdir=paths2assembly_dir)
             longest_surviving_substring_dir = \
                 os.path.join(assembly_stats_dir, 'longest_surviving_substr')
             find_longest_surviving_substring_paths(
-                paths=path_db.get_paths(),
+                paths=paths,
                 monoassembly_set=monoassembly,
                 outdir=longest_surviving_substring_dir)
 

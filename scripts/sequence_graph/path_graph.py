@@ -3,311 +3,699 @@
 # Released under the BSD license (see LICENSE file)
 
 import logging
-from collections import Counter, defaultdict, deque
+from collections import defaultdict
 import itertools
 import os
 
 import networkx as nx
 import numpy as np
 
-from config.config import config
 from sequence_graph.db_graph import DeBruijnGraph
 from sequence_graph.db_graph_3col import DeBruijnGraph3Color
-from utils.various import fst_iterable, filter_sublsts_n2_dict
 from utils.os_utils import smart_makedirs
+from utils.various import filter_sublsts_n2_dict, fst_iterable
 
 logger = logging.getLogger("centroFlye.sequence_graph.path_graph")
 
 
 class IDBMappings:
-    def __init__(self, mappings, paths):
+    def __init__(self, mappings):
+        mappings = filter_sublsts_n2_dict(mappings)
         self.mappings = mappings
-        self.paths = paths
-        self._update_active_connections()
 
-    def _update_active_connections(self, min_con=1):
-        self.mappings = {s_id: mapping
-                         for s_id, mapping in self.mappings.items()
-                         if len(mapping) > 1}
-        connections = Counter()
-        self.pairs_coords = defaultdict(list)
-        for s_id, mapping in self.mappings.items():
-            it1, it2 = itertools.tee(mapping)
-            next(it2, None)
-            for i, p in enumerate(zip(it1, it2)):
-                connections[p] += 1
-                self.pairs_coords[p].append((s_id, i))
-        for p in self.pairs_coords:
-            self.pairs_coords[p].sort(reverse=True)
-        self.active_connections = set(k for k, v in connections.items()
-                                      if v >= min_con)
+    def add(self, st, en, new):
+        for r_id, mapping in self.mappings.items():
+            additions = [0]
+            for i, a, b in zip(itertools.count(), mapping, mapping[1:]):
+                if a == st and b == en:
+                    additions.append(i+1)
+            new_mapping = []
+            for p1, p2 in zip(additions, additions[1:]):
+                new_mapping.append(mapping[p1:p2])
+                new_mapping.append([new])
+            new_mapping.append(mapping[additions[-1]:])
+            new_mapping = list(itertools.chain.from_iterable(new_mapping))
+            self.mappings[r_id] = new_mapping
+
+    def remove(self, edge):
+        for r_id, mapping in self.mappings.items():
+            self.mappings[r_id] = list(filter(lambda e: e != edge, mapping))
+
+    def merge(self, st, en):
+        # merge en into st
+        for r_id, mapping in self.mappings.items():
+            if len(mapping) and mapping[0] == en:
+                self.mappings[r_id][0] = st
+        self.remove(en)
+
+    def get_active_connections(self):
+        ac = set()
+        for mapping in self.mappings.values():
+            for a, b in zip(mapping, mapping[1:]):
+                ac.add((a, b))
+        return ac
+
+
+class LightPathDeBruijnGraph:
+    def __init__(self, nx_graph,
+                 edge2seq, edge2index, index2edge,
+                 max_edge_index, max_node_index,
+                 k,
+                 idb_mappings):
+        self.nx_graph = nx_graph
+        self.edge2seq = edge2seq
+        self.edge2index = edge2index
+        self.index2edge = index2edge
+        self.max_edge_index = max_edge_index
+        self.max_node_index = max_node_index
+        self.k = k
+        self.idb_mappings = idb_mappings
+
+        self.assert_validity()
 
     @classmethod
-    def from_graph(cls, graph, string_set,
-                   raw_mappings=None,
-                   neutral_symbs=None):
-        if neutral_symbs is None:
-            neutral_symbs = set()
+    def fromDB(cls, db, string_set, neutral_symbs=None, raw_mappings=None):
         if raw_mappings is None:
-            raw_mappings = graph.map_strings(string_set,
-                                             only_unique_paths=True,
-                                             neutral_symbs=neutral_symbs)
-        paths = {r_id: graph.get_path(edge_path, st, en)
-                 for r_id, (edge_path, st, en) in raw_mappings.items()}
+            raw_mappings = db.map_strings(string_set,
+                                          only_unique_paths=True,
+                                          neutral_symbs=neutral_symbs)
 
-        unfilt_mappings = {}
-        for s_id, (edge_list, _, _) in raw_mappings.items():
-            if len(edge_list) == 0:
-                continue
-            mapping = [graph.nx_graph.get_edge_data(*edge)['edge_index']
-                       for edge in edge_list]
-            unfilt_mappings[s_id] = mapping
+        nx_graph = nx.MultiDiGraph()
+        edge2seq = {}
+        edge_index = 0
+        edge2index = {}
+        index2edge = {}
+        for u, v, key, data in db.nx_graph.edges(data=True, keys=True):
+            nx_graph.add_edge(u, v, key)
+            edge2index[(u, v, key)] = edge_index
+            index2edge[edge_index] = (u, v, key)
+            edge2seq[edge_index] = list(data['string'])
+            edge_index += 1
 
-        mappings = filter_sublsts_n2_dict(unfilt_mappings)
-        mappings = {k: deque(v) for k, v in mappings.items()}
+        mappings = {}
+        for r_id, (raw_mapping, _, _) in raw_mappings.items():
+            mappings[r_id] = [edge2index[edge] for edge in raw_mapping]
 
-        return cls(mappings=mappings, paths=paths)
+        idb_mappings = IDBMappings(mappings)
+        max_node_index = 1 + max(nx_graph.nodes)
 
-    def remove_edge(self, edge_index):
-        for s_id, mapping in self.mappings.items():
-            mapping = deque(filter(lambda a: a != edge_index, mapping))
-            self.mappings[s_id] = mapping
-        self._update_active_connections()
-
-    def remove_edges(self, edge_indexes):
-        edge_indexes = set(edge_indexes)
-        for s_id, mapping in self.mappings.items():
-            mapping = deque(filter(lambda a: a not in edge_indexes, mapping))
-            self.mappings[s_id] = mapping
-        self._update_active_connections()
-
-    def insert_edge(self, edge_to_insert, edge_pair):
-        for (s_id, i) in self.pairs_coords[edge_pair]:
-            self.mappings[s_id].insert(i+1, edge_to_insert)
-        self._update_active_connections()
-
-    def insert_edges(self, edge_pairs_edges_to_insert):
-        for ep, edge in edge_pairs_edges_to_insert:
-            self.insert_edge(edge, ep)
-
-    def extend_nonbranching_mappings(self, db):
-        def get_inedges(edge_index):
-            s, _, _ = db.edge_index2edge[edge_index]
-            out_degree = db.nx_graph.out_degree(s)
-            inedges = list(db.nx_graph.in_edges(s, keys=True))
-            inedges = [db.nx_graph.get_edge_data(*edge)['edge_index']
-                       for edge in inedges]
-            return out_degree, inedges
-
-        for s_id, mapping in self.mappings.items():
-            if len(mapping) == 0:
-                continue
-            out_degree, inedges = get_inedges(mapping[0])
-            while out_degree == 1 and len(inedges) == 1:
-                mapping.insert(0, inedges[0])
-                out_degree, inedges = get_inedges(mapping[0])
-        self._update_active_connections()
-
-    def get_mapping_lens(self, db):
-        lens = {}
-        for s_id, mapping in self.mappings.items():
-            edge_path = [db.edge_index2edge[edge_index]
-                         for edge_index in mapping]
-            path = db.get_path(edge_path, respect_cycled=False)
-            lens[s_id] = len(path)
-        return lens
-
-    def remove_connections(self, removed_connections):
-        coords = defaultdict(lambda: [0])
-        for edge_pair in removed_connections:
-            for (s_id, i) in self.pairs_coords[edge_pair]:
-                coords[s_id].append(i)
-        for s_id, coords_s_id in coords.items():
-            coords_s_id.append(len(self.mappings[s_id]))
-            for i, (s, e) in enumerate(zip(coords_s_id[::2],
-                                           coords_s_id[1::2])):
-                self.mappings[f'{s_id}_{i}'] = \
-                    deque(list(self.mappings[s_id])[s:e])
-            del self.mappings[s_id]
-        self._update_active_connections()
-
-
-class PathDeBruijnGraph(DeBruijnGraph):
-    def __init__(self, db, idbmappings):
-        self.__dict__.update(db.__dict__)
-        self.idbmappings = idbmappings
+        return cls(nx_graph=nx_graph,
+                   edge2seq=edge2seq,
+                   edge2index=edge2index,
+                   index2edge=index2edge,
+                   max_edge_index=edge_index,
+                   max_node_index=max_node_index,
+                   k=db.k,
+                   idb_mappings=idb_mappings)
 
     @classmethod
-    def __increase_k_by_one(cls, db, idbmappings):
-        tr_nx_db = nx.MultiDiGraph()
+    def from_mono_db(cls, db, monostring_set,
+                     mappings=None):
+        monostring = fst_iterable(monostring_set.values())
+        neutral_symbs = set([monostring.gap_symb])
+        return cls.fromDB(db=db,
+                          string_set=monostring_set,
+                          neutral_symbs=neutral_symbs,
+                          raw_mappings=mappings)
+
+    def move_edge(self, e1_st, e1_en, e1_key,
+                  e2_st, e2_en, e2_key=None):
+        old_edge = (e1_st, e1_en, e1_key)
+        i = self.edge2index[old_edge]
+        self.nx_graph.remove_edge(*old_edge)
+        e2_key = self.nx_graph.add_edge(e2_st, e2_en, key=e2_key)
+        new_edge = (e2_st, e2_en, e2_key)
+        self.edge2index[new_edge] = i
+        del self.edge2index[old_edge]
+        self.index2edge[i] = new_edge
+
+    def remove_edge(self, edge=None, index=None, moving=True):
+        assert (edge is None) != (index is None)
+        if edge is None:
+            edge = self.index2edge[index]
+        else:
+            index = self.edge2index[edge]
+        self.idb_mappings.remove(index)
+        self.nx_graph.remove_edge(*edge)
+        del self.edge2index[edge]
+        del self.index2edge[index]
+        del self.edge2seq[index]
+
+        if moving:
+            for e in list(self.nx_graph.in_edges(edge[1], keys=True)):
+                self.move_edge(*e, e[0], edge[0])
+
+            for e in list(self.nx_graph.out_edges(edge[1], keys=True)):
+                self.move_edge(*e, edge[0], e[1])
+
+    def get_new_vertex_index(self):
+        self.max_node_index += 1
+        return self.max_node_index - 1
+
+    def merge_edges(self, e1, e2):
+        # merge edge e2 into e1
+        assert self.nx_graph.degree(e1[1]) == 1
+        assert self.nx_graph.degree(e2[0]) == 1
+        i = self.edge2index[e1]
+        j = self.edge2index[e2]
+        self.idb_mappings.merge(i, j)
+        in_seq = self.edge2seq[i]
+        out_seq = self.edge2seq[j]
+        assert in_seq[-self.k+1:] == out_seq[:self.k-1]
+        seq = in_seq + out_seq[self.k-1:]
+        self.edge2seq[i] = seq
+        self.move_edge(*e1, e1[0], e2[1])
+        self.remove_edge(edge=e2, moving=False)
+
+    def add_edge(self, i, j, seq):
+        in_edge = self.index2edge[i]
+        out_edge = self.index2edge[j]
+        new_edge = (in_edge[1], out_edge[0])
+        key = self.nx_graph.add_edge(*new_edge)
+        new_edge = (*new_edge, key)
+        self.edge2index[new_edge] = self.max_edge_index
+        self.index2edge[self.max_edge_index] = new_edge
+        self.edge2seq[self.max_edge_index] = seq
+        self.idb_mappings.add(i, j, self.max_edge_index)
+        self.max_edge_index += 1
+
+    def __process_vertex(self, u):
+        def process_simple():
+            if indegree == 1 and outdegree == 1:
+                # node on nonbranching path - should not be happening
+                assert False
+
+            if indegree == 0 and outdegree == 0:
+                # isolate - should be removed
+                self.nx_graph.remove_node(u)
+
+            elif indegree == 0 and outdegree > 0:
+                # starting vertex
+                for j in out_indexes[1:]:
+                    old_edge = self.index2edge[j]
+                    new_edge = (self.get_new_vertex_index(), old_edge[1], 0)
+                    self.move_edge(*old_edge, *new_edge)
+
+            elif indegree > 0 and outdegree == 0:
+                # ending vertex
+                for i in in_indexes[1:]:
+                    old_edge = self.index2edge[i]
+                    new_edge = (old_edge[0], self.get_new_vertex_index(), 0)
+                    self.move_edge(*old_edge, *new_edge)
+
+            elif indegree == 1 and outdegree > 1:
+                # simple 1-in vertex
+                assert len(in_indexes) == 1
+                in_index = in_indexes[0]
+                in_seq = self.edge2seq[in_index]
+                c = in_seq[-self.k]
+                for j in out_indexes:
+                    assert self.edge2seq[j][:self.k-1] == in_seq[-self.k+1:]
+                    self.edge2seq[j].insert(0, c)
+
+            elif indegree > 1 and outdegree == 1:
+                # simple 1-out vertex
+                assert len(out_indexes) == 1
+                out_index = out_indexes[0]
+                out_seq = self.edge2seq[out_index]
+                c = out_seq[self.k-1]
+                for i in in_indexes:
+                    assert self.edge2seq[i][-self.k+1:] == out_seq[:self.k-1]
+                    self.edge2seq[i].append(c)
+
+        def process_complex():
+            # complex vertex
+            for i in in_indexes:
+                old_edge = self.index2edge[i]
+                new_edge = (old_edge[0], self.get_new_vertex_index(), 0)
+                self.move_edge(*old_edge, *new_edge)
+
+            for j in out_indexes:
+                old_edge = self.index2edge[j]
+                new_edge = (self.get_new_vertex_index(), old_edge[1], 0)
+                self.move_edge(*old_edge, *new_edge)
+
+            all_ac = self.idb_mappings.get_active_connections()
+            ac_s2e = defaultdict(set)
+            ac_e2s = defaultdict(set)
+            for e_in in in_indexes:
+                for e_out in out_indexes:
+                    if (e_in, e_out) in all_ac:
+                        ac_s2e[e_in].add(e_out)
+                        ac_e2s[e_out].add(e_in)
+
+            merged = {}
+            for i in ac_s2e:
+                for j in ac_s2e[i]:
+                    if i in merged:
+                        i = merged[i]
+                    if j in merged:
+                        j = merged[j]
+                    e_i = self.index2edge[i]
+                    e_j = self.index2edge[j]
+                    in_seq = self.edge2seq[i]
+                    out_seq = self.edge2seq[j]
+                    assert in_seq[-self.k+1:] == out_seq[:self.k-1]
+                    if len(ac_s2e[i]) == len(ac_e2s[j]) == 1:
+                        self.merge_edges(e_i, e_j)
+                        merged[j] = i
+                    elif len(ac_s2e[i]) >= 2 and len(ac_e2s[j]) >= 2:
+                        seq = in_seq[-self.k:] + [out_seq[self.k-1]]
+                        assert len(seq) == self.k + 1
+                        self.add_edge(i, j, seq)
+                    elif len(ac_s2e[i]) == 1 and len(ac_e2s[j]) >= 2:
+                        # extend left edge to the right
+                        self.move_edge(*e_i, e_i[0], e_j[0])
+                        seq = in_seq + [out_seq[self.k-1]]
+                        self.edge2seq[i] = seq
+                    elif len(ac_e2s[j]) == 1 and len(ac_s2e[i]) >= 2:
+                        # extend right edge to the left
+                        self.move_edge(*e_j, e_i[1], e_j[1])
+                        seq = [in_seq[-self.k]] + out_seq
+                        self.edge2seq[j] = seq
+                    else:
+                        assert False
+
+            assert self.nx_graph.in_degree(u) == 0
+            assert self.nx_graph.out_degree(u) == 0
+            self.nx_graph.remove_node(u)
+
+        in_indexes = [self.edge2index[e_in]
+                      for e_in in self.nx_graph.in_edges(u, keys=True)]
+        out_indexes = [self.edge2index[e_out]
+                       for e_out in self.nx_graph.out_edges(u, keys=True)]
+
+        indegree = self.nx_graph.in_degree(u)
+        outdegree = self.nx_graph.out_degree(u)
+
+        if indegree >= 2 and outdegree >= 2:
+            process_complex()
+        else:
+            process_simple()
+
+    def assert_validity(self):
+        self.max_edge_index == 1 + max(self.index2edge)
+        self.max_node_index == 1 + max(self.nx_graph.nodes)
+        edges = set(self.nx_graph.edges(keys=True))
+        assert edges == set(self.edge2index.keys())
+        assert edges == set(self.index2edge.values())
+        assert all(edge == self.index2edge[self.edge2index[edge]]
+                   for edge in self.edge2index)
+
+        ac = self.idb_mappings.get_active_connections()
+        for i, j in ac:
+            _, u, _ = self.index2edge[i]
+            v, _, _ = self.index2edge[j]
+            assert u == v
+
+        for node in self.nx_graph.nodes:
+            assert self.nx_graph.in_degree(node) != 1 or \
+                self.nx_graph.out_degree(node) != 1
+            for in_edge in self.nx_graph.in_edges(node, keys=True):
+                e_index = self.edge2index[in_edge]
+                in_seq = self.edge2seq[e_index]
+                for out_edge in self.nx_graph.out_edges(node, keys=True):
+                    e_outdex = self.edge2index[out_edge]
+                    out_seq = self.edge2seq[e_outdex]
+                    assert in_seq[-self.k+1:] == out_seq[:self.k-1]
+
+    def increase_k_by_one(self):
+        for u in list(self.nx_graph.nodes):
+            self.__process_vertex(u)
+
+        self.k += 1
+        collapsed_edges = \
+            [self.edge2index[edge] for edge in self.nx_graph.edges
+             if len(self.edge2seq[self.edge2index[edge]]) == self.k - 1]
+        # remove collapsed edges
+        [self.remove_edge(index=index) for index in collapsed_edges]
+        self.assert_validity()
+
+    def increase_k(self, K):
+        for i in range(K-self.k):
+            logger.info(f'Increasing k: {self.k}->{self.k+1}')
+            self.increase_k_by_one()
+
+    def toDB(self, outdir=None, assembly=None):
+        nx_graph = nx.MultiDiGraph()
         nodeindex2label = {}
         nodelabel2index = {}
-
-        k = db.k
-        node_cnt = 0
-
-        eindex2st = {}
-        eindex2en = {}
-        max_edge_index = 0
-        edge2node = []
-
-        for st, en, key, edge_data in db.nx_graph.edges(keys=True, data=True):
-            max_edge_index = max(max_edge_index, edge_data[cls.edge_index])
-            if k < len(edge_data[cls.string]):
-                pref = edge_data[cls.string][:k]
-                suff = edge_data[cls.string][-k:]
-                nodeindex2label[node_cnt] = pref
-                nodeindex2label[node_cnt+1] = suff
-                nodelabel2index[pref] = node_cnt
-                nodelabel2index[suff] = node_cnt+1
-
-                length = edge_data[cls.length]-1
-                label = DeBruijnGraph._generate_label(
-                    {DeBruijnGraph.length: length,
-                     DeBruijnGraph.coverage: np.mean(edge_data[cls.coverage]),
-                     DeBruijnGraph.edge_index: edge_data[cls.edge_index]}
-                )
-                edge_index = edge_data[cls.edge_index]
-                cov = edge_data[cls.coverage][:-1]
-                tr_nx_db.add_edge(node_cnt, node_cnt+1,
-                                  string=edge_data[cls.string],
-                                  coverage=cov,
-                                  label=label,
-                                  length=length,
-                                  color=edge_data[cls.color],
-                                  edge_index=edge_index)
-                eindex2st[edge_index] = node_cnt
-                eindex2en[edge_index] = node_cnt + 1
-                node_cnt += 2
-            else:
-                label = edge_data[cls.string]
-                nodeindex2label[node_cnt] = label
-                nodelabel2index[label] = node_cnt
-                tr_nx_db.add_node(node_cnt)
-                edge_index = edge_data[cls.edge_index]
-                edge2node.append(edge_index)
-                eindex2st[edge_index] = node_cnt
-                eindex2en[edge_index] = node_cnt
-                node_cnt += 1
-
-        insertions = []
-        removed_connections = []
-        for node in db.nodeindex2label:
-            in_degree = db.nx_graph.in_degree(node)
-            out_degree = db.nx_graph.out_degree(node)
-            simple_vertex = in_degree <= 1 or out_degree <= 1
-            for _, _, _, st_data in db.nx_graph.in_edges(node,
-                                                         data=True,
-                                                         keys=True):
-                st_edge_index = st_data[cls.edge_index]
-                st = eindex2en[st_edge_index]
-                for _, _, _, en_data in db.nx_graph.out_edges(node,
-                                                              data=True,
-                                                              keys=True):
-                    en_edge_index = en_data[cls.edge_index]
-                    en = eindex2st[en_edge_index]
-                    connection = (st_edge_index, en_edge_index)
-                    is_active = connection in idbmappings.active_connections
-                    if simple_vertex or is_active:
-                        max_edge_index += 1
-                        last_chr = nodeindex2label[en][-1]
-                        string = nodeindex2label[st] + (last_chr,)
-                        label_params = {'length': 1,
-                                        'coverage': 1.00,
-                                        'edge_index': max_edge_index}
-                        label = DeBruijnGraph._generate_label(label_params)
-                        insertions.append(((st_edge_index, en_edge_index),
-                                           max_edge_index))
-                        tr_nx_db.add_edge(st, en,
-                                          string=string,
-                                          coverage=[1],
-                                          label=label,
-                                          length=1,
-                                          color='black',
-                                          edge_index=max_edge_index)
-                    else:
-                        removed_connections.append(connection)
-
-        mapping_lens = idbmappings.get_mapping_lens(db)
-        db = DeBruijnGraph(nx_graph=tr_nx_db,
+        for i, (u, v, key) in self.index2edge.items():
+            seq = tuple(self.edge2seq[i])
+            u_label = seq[:self.k-1]
+            v_label = seq[-self.k+1:]
+            nodelabel2index[u_label] = u
+            nodelabel2index[v_label] = v
+            nodeindex2label[u] = u_label
+            nodeindex2label[v] = v_label
+            edge_len = len(seq) - self.k + 1
+            cov = [1] * edge_len
+            mean_cov = np.mean(cov)
+            label = f'index={i}\nlen={edge_len}\ncov={mean_cov:0.2f}'
+            nx_graph.add_edge(u, v, key=key,
+                              coverage=cov,
+                              edge_index=i,
+                              edge_len=edge_len,
+                              label=label,
+                              string=seq,
+                              color='black')
+        db = DeBruijnGraph(k=self.k,
+                           nx_graph=nx_graph,
                            nodeindex2label=nodeindex2label,
-                           nodelabel2index=nodelabel2index,
-                           k=k+1, collapse=False)
-
-        idbmappings.remove_connections(removed_connections)
-        idbmappings.insert_edges(insertions)
-        idbmappings.remove_edges(edge2node)
-        idbmappings.extend_nonbranching_mappings(db)
-
-        edges_to_remove = db.collapse_nonbranching_paths()
-        idbmappings.remove_edges(edges_to_remove)
-
-        new_mapping_lens = idbmappings.get_mapping_lens(db)
-        for s_id, new_len in new_mapping_lens.items():
-            if s_id in mapping_lens:
-                old_len = mapping_lens[s_id]
-                if old_len > new_len:
-                    logger.error(s_id, old_len, new_len)
-                assert old_len <= new_len
-
-        return db, idbmappings
-
-    @classmethod
-    def from_db(cls, db, string_set, k,
-                remap_iter=config['path_db']['remap_iter'],
-                neutral_symbs=None,
-                mappings=None,
-                outdir=None,
-                assembly=None):
-        if neutral_symbs is None:
-            neutral_symbs = set()
-        logger.info('Constructing a path graph')
-        niter = k - db.k
-        logger.info(f'Starting from DB(k) with k = {db.k}')
-        logger.info(f'Goal: k = {k}. # iterations = {niter}')
-        for i in range(niter):
-            if i % remap_iter == 0:
-                idbmappings = \
-                    IDBMappings.from_graph(graph=db,
-                                           string_set=string_set,
-                                           raw_mappings=mappings,
-                                           neutral_symbs=neutral_symbs)
-            logger.info(f'Iteration #{i+1}, k = {db.k+1}')
-            db, idbmappings = cls.__increase_k_by_one(db, idbmappings)
-
-        obj = cls(db=db, idbmappings=idbmappings)
-
+                           nodelabel2index=nodelabel2index)
         if outdir is not None:
             smart_makedirs(outdir)
-            dot_file = os.path.join(outdir, f'db_k{k}.dot')
+            dot_file = os.path.join(outdir, f'db_K{self.k}.dot')
             db.write_dot(outfile=dot_file, export_pdf=False)
 
-            dot_compact_file = os.path.join(outdir, f'db_k{k}_compact.dot')
+            dot_compact_file = os.path.join(outdir,
+                                            f'db_K{self.k}_compact.dot')
             db.write_dot(outfile=dot_compact_file,
                          export_pdf=True,
                          compact=True)
-            pickle_file = os.path.join(outdir, f'db_k{k}.pickle')
+            db.write_dot(outfile=dot_file, export_pdf=False)
+            pickle_file = os.path.join(outdir, f'db_K{self.k}.pickle')
             db.pickle_dump(pickle_file)
             if assembly is not None:
-                DeBruijnGraph3Color.from_read_db_and_assembly(gr_reads=db,
-                                                              assembly=assembly,
-                                                              outdir=outdir)
-        return obj
+                DeBruijnGraph3Color.from_read_db_and_assembly(
+                    gr_reads=db, assembly=assembly, outdir=outdir)
+        return db
 
-    @classmethod
-    def from_mono_db(cls, db, monostring_set, k,
-                     mappings=None,
-                     outdir=None,
-                     assembly=None):
-        monostring = fst_iterable(monostring_set.values())
-        neutral_symbs = set([monostring.gap_symb])
-        return cls.from_db(db=db,
-                           string_set=monostring_set,
-                           k=k,
-                           neutral_symbs=neutral_symbs,
-                           mappings=mappings,
-                           outdir=outdir,
-                           assembly=assembly)
 
-    def get_paths(self):
-        return self.idbmappings.paths
+# Some tests TODO move
+
+# graph starting vertex
+class DBStVertex:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 1, string='AAAAA')
+    nx_graph.add_edge(0, 2, string='AAACA')
+    nx_graph.add_edge(0, 3, string='AAA')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(DBStVertex(),
+                                        string_set={},
+                                        raw_mappings={0: ([(0, 1, 0)], 0, 0),
+                                                      1: ([(0, 2, 0)], 0, 0),
+                                                      2: ([(0, 3, 0)], 0, 0)})
+assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: [2]}
+lightdb.increase_k_by_one()
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == [((0, 1, 0), 0), ((4, 2, 0), 1)]
+assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: []}
+
+
+# graph ending vertex
+class DBEnVertex:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 3, string='AAAA')
+    nx_graph.add_edge(1, 3, string='AACA')
+    nx_graph.add_edge(2, 3, string='AAA')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(DBEnVertex(),
+                                        string_set={},
+                                        raw_mappings={0: ([(0, 3, 0)], 0, 0),
+                                                      1: ([(1, 3, 0)], 0, 0),
+                                                      2: ([(2, 3, 0)], 0, 0)})
+assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: [2]}
+lightdb.increase_k_by_one()
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == [((0, 3, 0), 0), ((1, 4, 0), 1)]
+assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: []}
+
+
+# graph 1-in >1-out
+class DB1inVertex:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 1, string='AACAG')
+    nx_graph.add_edge(1, 2, string='AGACC')
+    nx_graph.add_edge(1, 3, string='AGATT')
+    nx_graph.add_edge(1, 4, string='AGAGG')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(
+    DB1inVertex(), string_set={}, raw_mappings={})
+assert[lightdb.edge2seq[lightdb.edge2index[edge]]
+       for edge in lightdb.nx_graph.edges] == [list('AACAG'),
+                                               ['A', 'G', 'A', 'C', 'C'],
+                                               ['A', 'G', 'A', 'T', 'T'],
+                                               ['A', 'G', 'A', 'G', 'G']]
+lightdb.increase_k_by_one()
+assert[lightdb.edge2seq[lightdb.edge2index[edge]]
+       for edge in lightdb.nx_graph.edges] == [list('AACAG'),
+                                               ['C', 'A', 'G', 'A', 'C', 'C'],
+                                               ['C', 'A', 'G', 'A', 'T', 'T'],
+                                               ['C', 'A', 'G', 'A', 'G', 'G']]
+
+
+# graph >1-in 1-out
+class DB1outVertex:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 3, string='CCAGA')
+    nx_graph.add_edge(1, 3, string='TTAGA')
+    nx_graph.add_edge(2, 3, string='GGAGA')
+    nx_graph.add_edge(3, 4, string='GAAAA')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(
+    DB1outVertex(), string_set={}, raw_mappings={})
+assert sorted(
+    [lightdb.edge2seq[lightdb.edge2index[edge]]
+     for edge in lightdb.nx_graph.edges]) == sorted(
+    [list('CCAGA'),
+     list('TTAGA'),
+     list('GGAGA'),
+     list('GAAAA')])
+lightdb.increase_k_by_one()
+assert sorted(
+    [lightdb.edge2seq[lightdb.edge2index[edge]]
+     for edge in lightdb.nx_graph.edges]) == sorted(
+    [list('CCAGAA'),
+     list('TTAGAA'),
+     list('GGAGAA'),
+     list('GAAAA')])
+
+
+# graph with a complex vertex
+
+class DBComplexVertex1:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 2, string='ACAAA')
+    nx_graph.add_edge(1, 2, string='GGAAA')
+    nx_graph.add_edge(2, 3, string='AATGC')
+    nx_graph.add_edge(2, 4, string='AATT')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(
+    DBComplexVertex1(),
+    string_set={},
+    raw_mappings={0: ([(0, 2, 0), (2, 3, 0)], 0, 0),
+                  1: ([(0, 2, 0), (2, 4, 0)], 0, 0),
+                  2: ([(1, 2, 0), (2, 4, 0)], 0, 0)})
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == \
+         [((0, 2, 0), 0), ((2, 3, 0), 1), ((2, 4, 0), 2), ((1, 2, 0), 3)]
+lightdb.increase_k_by_one()
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == \
+    [((0, 5, 0), 0),
+     ((1, 8, 0), 3),
+     ((5, 3, 0), 1),
+     ((5, 8, 0), 4),
+     ((8, 4, 0), 2)]
+assert lightdb.edge2seq == \
+    {0: ['A', 'C', 'A', 'A', 'A'],
+     1: ['A', 'A', 'A', 'T', 'G', 'C'],
+     2: ['A', 'A', 'T', 'T'],
+     3: ['G', 'G', 'A', 'A', 'A', 'T'],
+     4: ['A', 'A', 'A', 'T']}
+
+
+# graph with a complex vertex
+
+class DBComplexVertex2:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 2, string='ACAAA')
+    nx_graph.add_edge(1, 2, string='GGAAA')
+    nx_graph.add_edge(2, 3, string='AATGC')
+    nx_graph.add_edge(2, 4, string='AATT')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(
+    DBComplexVertex2(),
+    string_set={},
+    raw_mappings={0: ([(0, 2, 0), (2, 3, 0)], 0, 0),
+                  1: ([(0, 2, 0), (2, 4, 0)], 0, 0),
+                  2: ([(1, 2, 0), (2, 4, 0)], 0, 0),
+                  3: ([(1, 2, 0), (2, 3, 0)], 0, 0)})
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == \
+         [((0, 2, 0), 0), ((2, 3, 0), 1), ((2, 4, 0), 2), ((1, 2, 0), 3)]
+lightdb.increase_k_by_one()
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == \
+    [((0, 5, 0), 0), ((1, 6, 0), 3), ((5, 7, 0), 4),
+     ((5, 8, 0), 5), ((6, 7, 0), 6),
+     ((6, 8, 0), 7), ((7, 3, 0), 1), ((8, 4, 0), 2)]
+assert lightdb.edge2seq == \
+    {0: ['A', 'C', 'A', 'A', 'A'],
+     1: list('AATGC'),
+     2: list('AATT'),
+     3: ['G', 'G', 'A', 'A', 'A'],
+     4: list('AAAT'),
+     5: list('AAAT'),
+     6: list('AAAT'),
+     7: list('AAAT')}
+
+
+# graph with a complex vertex
+
+class DBComplexVertex3:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 2, string='CCAC')
+    nx_graph.add_edge(1, 2, string='TTAC')
+    nx_graph.add_edge(2, 5, string='ACG')
+    nx_graph.add_edge(3, 5, string='AACG')
+    nx_graph.add_edge(5, 4, string='CGTA')
+    nx_graph.add_edge(5, 6, string='CGA')
+    nx_graph.add_edge(6, 7, string='GACC')
+    nx_graph.add_edge(6, 8, string='GATT')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(
+    DBComplexVertex3(),
+    string_set={},
+    raw_mappings={0: ([(0, 2, 0),
+                       (2, 5, 0),
+                       (5, 6, 0),
+                       (6, 7, 0)],
+                      0, 0),
+                  1: ([(1, 2, 0),
+                       (2, 5, 0),
+                       (5, 4, 0)],
+                      0, 0),
+                  2: ([(3, 5, 0),
+                       (5, 6, 0),
+                       (6, 8, 0)],
+                      0, 0)})
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == \
+    [((0, 2, 0), 0), ((2, 5, 0), 1),
+     ((5, 4, 0), 3), ((5, 6, 0), 4), ((1, 2, 0), 2),
+     ((6, 7, 0), 6), ((6, 8, 0), 7), ((3, 5, 0), 5)]
+lightdb.increase_k_by_one()
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == \
+    [((0, 2, 0), 0), ((2, 4, 0), 3),
+     ((2, 12, 0), 8), ((1, 2, 0), 2), ((3, 12, 0), 5),
+     ((12, 7, 0), 6), ((12, 8, 0), 7)]
+assert lightdb.edge2seq == \
+    {0: ['C', 'C', 'A', 'C', 'G'],
+     2: ['T', 'T', 'A', 'C', 'G'],
+     3: ['A', 'C', 'G', 'T', 'A'],
+     5: ['A', 'A', 'C', 'G', 'A'],
+     6: ['C', 'G', 'A', 'C', 'C'],
+     7: ['C', 'G', 'A', 'T', 'T'],
+     8: ['A', 'C', 'G', 'A']}
+
+
+# graph with a loop
+
+class DBLoop:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 1, string='CCAA')
+    nx_graph.add_edge(1, 1, string='AACAA')
+    nx_graph.add_edge(1, 2, string='AATT')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(
+    DBLoop(), string_set={},
+    raw_mappings={0: ([(0, 1, 0), (1, 1, 0)], 0, 0),
+                  1: ([(1, 1, 0), (1, 2, 0)], 0, 0)})
+lightdb.increase_k_by_one()
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == [((0, 2, 0), 0)]
+lightdb.edge2seq
+assert lightdb.edge2seq == \
+    {0: ['C', 'C', 'A', 'A', 'C', 'A', 'A', 'T', 'T']}
+
+
+# graph with a loop
+
+class DBLoop2:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 1, string='CCAA')
+    nx_graph.add_edge(1, 1, string='AACAA')
+    nx_graph.add_edge(1, 1, string='AAGAA')
+    nx_graph.add_edge(1, 2, string='AATT')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(
+    DBLoop2(), string_set={},
+    raw_mappings={0: ([(0, 1, 0), (1, 1, 0), (1, 2, 0)], 0, 0),
+                  1: ([(0, 1, 0), (1, 1, 1), (1, 2, 0)], 0, 0)})
+lightdb.increase_k_by_one()
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == \
+         [((0, 3, 0), 0), ((3, 8, 0), 1), ((3, 8, 1), 2), ((8, 2, 0), 3)]
+lightdb.edge2seq
+assert lightdb.edge2seq == \
+    {0: ['C', 'C', 'A', 'A'],
+     1: ['C', 'A', 'A', 'C', 'A', 'A', 'T'],
+     2: ['C', 'A', 'A', 'G', 'A', 'A', 'T'],
+     3: ['A', 'A', 'T', 'T']}
+
+
+# graph with a loop
+
+class DBLoop3:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 1, string='CCAA')
+    nx_graph.add_edge(1, 1, string='AACAA')
+    nx_graph.add_edge(1, 1, string='AAGAA')
+    nx_graph.add_edge(1, 2, string='AATT')
+    nx_graph.add_edge(3, 1, string='GGAA')
+    nx_graph.add_edge(1, 4, string='AARR')
+
+
+lightdb = LightPathDeBruijnGraph.fromDB(
+    DBLoop3(),
+    string_set={},
+    raw_mappings={0: ([(0, 1, 0),
+                       (1, 1, 0),
+                       (1, 2, 0)],
+                      0, 0),
+                  1: ([(3, 1, 0),
+                       (1, 1, 1),
+                       (1, 1, 1),
+                       (1, 4, 0)],
+                      0, 0),
+                  2: ([(3, 1, 0),
+                       (1, 2, 0)],
+                      0, 0)})
+lightdb.increase_k_by_one()
+assert [(edge, lightdb.edge2index[edge])
+        for edge in lightdb.nx_graph.edges] == \
+    [((0, 11, 0), 0), ((3, 8, 0), 5), ((7, 10, 0), 6),
+     ((7, 4, 0), 4), ((8, 10, 0), 7), ((8, 11, 0), 8),
+     ((10, 7, 0), 2), ((11, 2, 0), 3)]
+lightdb.edge2seq
+assert lightdb.edge2seq == \
+    {0: ['C', 'C', 'A', 'A', 'C', 'A', 'A', 'T'],
+     2: ['A', 'A', 'G', 'A', 'A'],
+     3: ['A', 'A', 'T', 'T'],
+     4: ['G', 'A', 'A', 'R', 'R'],
+     5: ['G', 'G', 'A', 'A'],
+     6: ['G', 'A', 'A', 'G'],
+     7: ['G', 'A', 'A', 'G'],
+     8: ['G', 'A', 'A', 'T']}
