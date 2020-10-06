@@ -1,5 +1,5 @@
 binaries:
-    SD: 'run_decomposer'
+    SD: 'scripts/ext/stringdecomposer/sd/bin/dp'
 common:
     threads: 4
 mapping:

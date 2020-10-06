@@ -12,6 +12,10 @@ root_dir = os.path.join(this_dirname, os.path.pardir, os.path.pardir)
 def get_config():
     with open(config_fn) as f:
         config = yaml.safe_load(f)
+    for binary, fn in config['binaries'].items():
+        fn = os.path.join(root_dir, fn)
+        fn = expandpath(fn)
+        config['binaries'][binary] = fn
     return config
 
 
