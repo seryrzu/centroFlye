@@ -128,19 +128,20 @@ class centroFlye:
         path_db_light.increase_k(K=config['path_db']['K'])
         path_db = path_db_light.toDB(outdir=path_db_outdir,
                                      assembly=monoassembly)
-        if params.assembly is not None:
-            paths2assembly_dir = os.path.join(assembly_stats_dir,
-                                              'paths2monoassembly')
-            paths = path_db_light.get_paths()
-            map_paths_to_monoassembly(paths=paths,
-                                      monoassembly_set=monoassembly,
-                                      outdir=paths2assembly_dir)
-            longest_surviving_substring_dir = \
-                os.path.join(assembly_stats_dir, 'longest_surviving_substr')
-            find_longest_surviving_substring_paths(
-                paths=paths,
-                monoassembly_set=monoassembly,
-                outdir=longest_surviving_substring_dir)
+        # TODO fix
+        # if params.assembly is not None:
+        #     paths2assembly_dir = os.path.join(assembly_stats_dir,
+        #                                       'paths2monoassembly')
+        #     paths = path_db_light.get_paths()
+        #     map_paths_to_monoassembly(paths=paths,
+        #                               monoassembly_set=monoassembly,
+        #                               outdir=paths2assembly_dir)
+        #     longest_surviving_substring_dir = \
+        #         os.path.join(assembly_stats_dir, 'longest_surviving_substr')
+        #     find_longest_surviving_substring_paths(
+        #         paths=paths,
+        #         monoassembly_set=monoassembly,
+        #         outdir=longest_surviving_substring_dir)
 
         scaffolding_outdir = os.path.join(params.outdir, 'scaffolding')
         monoscaffolds2scaffolds(path_db, sd_report.monostring_set,
