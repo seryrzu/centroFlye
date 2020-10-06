@@ -121,17 +121,17 @@ class centroFlye:
                                    mode=params.mode)
         db = dbs[config['idb']['maxk']]
         path_db_outdir = os.path.join(params.outdir, 'path_db')
-        path_db = \
+        path_db_light = \
             LightPathDeBruijnGraph.from_mono_db(db=db,
                                                 monostring_set=monoreads_set)
 
-        path_db.increase_k(K=config['path_db']['K'])
-        path_db = path_db.toDB(outdir=path_db_outdir,
-                               assembly=monoassembly)
+        path_db_light.increase_k(K=config['path_db']['K'])
+        path_db = path_db_light.toDB(outdir=path_db_outdir,
+                                     assembly=monoassembly)
         if params.assembly is not None:
             paths2assembly_dir = os.path.join(assembly_stats_dir,
                                               'paths2monoassembly')
-            paths = path_db.get_paths()
+            paths = path_db_light.get_paths()
             map_paths_to_monoassembly(paths=paths,
                                       monoassembly_set=monoassembly,
                                       outdir=paths2assembly_dir)

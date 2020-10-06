@@ -381,6 +381,9 @@ class LightPathDeBruijnGraph:
                     gr_reads=db, assembly=assembly, outdir=outdir)
         return db
 
+    def get_paths(self):
+        return self.idb_mappings.mappings
+
 
 # Some tests TODO move
 
