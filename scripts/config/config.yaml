@@ -1,5 +1,5 @@
 binaries:
-    SD: 'scripts/ext/stringdecomposer/sd/bin/dp'
+    SD: 'scripts/ext/stringdecomposer/sd/run_decomposer.py'
 common:
     threads: 4
 mapping:
