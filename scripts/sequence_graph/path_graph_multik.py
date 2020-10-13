@@ -8,6 +8,7 @@ from collections import defaultdict
 import networkx as nx
 
 from sequence_graph.path_graph import IDBMappings
+from subprocess import call
 from utils.various import fst_iterable
 
 
@@ -374,6 +375,28 @@ class PathMultiKGraph:
     def transform(self, N):
         for _ in range(N):
             self.transform_single()
+
+    def write_dot(self, outfile, compact=False, export_pdf=True):
+        if outfile[-3:] == 'dot':
+            outfile = outfile[:-4]
+        graph = nx.MultiDiGraph()
+        for node in self.nx_graph.nodes():
+            graph.add_node(node, label=f'{node} len={self.node2len[node]}')
+        for edge in self.nx_graph.edges(keys=True):
+            index = self.edge2index[edge]
+            seq = self.edge2seq[index] if not compact else None
+            seqlen = len(self.edge2seq[index])
+            graph.add_edge(*edge,
+                           label=f'index={index}\nlen={seqlen}',
+                           seq=seq)
+        dotfile = f'{outfile}.dot'
+        nx.drawing.nx_pydot.write_dot(graph, dotfile)
+        if export_pdf:
+            pdffile = f'{outfile}.pdf'
+            print(pdffile)
+            # https://stackoverflow.com/a/3516106
+            cmd = ['dot', '-Tpdf', dotfile, '-o', pdffile]
+            call(cmd)
 
 
 class DB1:
