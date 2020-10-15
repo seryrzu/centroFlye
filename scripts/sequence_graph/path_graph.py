@@ -12,6 +12,7 @@ import numpy as np
 
 from sequence_graph.db_graph import DeBruijnGraph
 from sequence_graph.db_graph_3col import DeBruijnGraph3Color
+from utils.bio import read_bio_seqs, RC
 from utils.os_utils import smart_makedirs
 from utils.various import filter_sublsts_n2_dict, fst_iterable
 
@@ -20,7 +21,7 @@ logger = logging.getLogger("centroFlye.sequence_graph.path_graph")
 
 class IDBMappings:
     def __init__(self, mappings):
-        mappings = filter_sublsts_n2_dict(mappings)
+        # mappings = filter_sublsts_n2_dict(mappings)
         self.mappings = mappings
 
     def add(self, st, en, new):
@@ -106,6 +107,64 @@ class LightPathDeBruijnGraph:
                    max_edge_index=edge_index,
                    max_node_index=max_node_index,
                    k=db.k,
+                   idb_mappings=idb_mappings)
+
+    @classmethod
+    def fromDR(cls, db_fn, align_fn, k):
+        class PerfectHash:
+            hash2index = {}
+            next_key = 0
+
+            def __getitem__(self, key):
+                if key in self.hash2index:
+                    return self.hash2index[key]
+                self.hash2index[key] = self.next_key
+                self.next_key += 1
+                return self.hash2index[key]
+
+        db = read_bio_seqs(db_fn)
+        nx_graph = nx.MultiDiGraph()
+        edge2seq = {}
+        edge2index = {}
+        index2edge = {}
+        ph = PerfectHash()
+        max_edge_index = 0
+        vertex_nucl2edgeindex = {}
+        for e_id, seq in db.items():
+            index, s, e = [int(x) for x in e_id.split('_')]
+            s = ph[s]
+            e = ph[e]
+            key = nx_graph.add_edge(s, e)
+            edge = (s, e, key)
+            edge2seq[index] = list(seq)
+            edge2index[edge] = index
+            index2edge[index] = edge
+            max_edge_index = max(index, max_edge_index)
+            vertex_nucl2edgeindex[(s, seq[k-1])] = index
+
+        max_edge_index += 1
+
+        mappings = {}
+        with open(align_fn) as f:
+            for i, line in enumerate(f):
+                s_id, u, nucl = line.strip().split()
+                u = ph[int(u)]
+                mapping = []
+                for c in nucl:
+                    e = vertex_nucl2edgeindex[(u, c)]
+                    mapping.append(e)
+                    u = index2edge[e][1]
+                mappings[s_id] = mapping
+
+        idb_mappings = IDBMappings(mappings)
+
+        return cls(nx_graph=nx_graph,
+                   edge2seq=edge2seq,
+                   edge2index=edge2index,
+                   index2edge=index2edge,
+                   max_edge_index=max_edge_index,
+                   max_node_index=ph.next_key,
+                   k=k,
                    idb_mappings=idb_mappings)
 
     @classmethod
@@ -317,7 +376,9 @@ class LightPathDeBruijnGraph:
                 for out_edge in self.nx_graph.out_edges(node, keys=True):
                     e_outdex = self.edge2index[out_edge]
                     out_seq = self.edge2seq[e_outdex]
-                    assert in_seq[-self.k+1:] == out_seq[:self.k-1]
+                    inkmer = in_seq[-self.k+1:]
+                    outkmer = out_seq[:self.k-1]
+                    assert inkmer == outkmer# or inkmer == RC(outkmer)
 
     def increase_k_by_one(self):
         for u in list(self.nx_graph.nodes):
