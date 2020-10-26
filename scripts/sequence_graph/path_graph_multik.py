@@ -6,10 +6,11 @@ import logging
 from collections import defaultdict, Counter
 
 import networkx as nx
+import edlib
 
 from sequence_graph.path_graph import IDBMappings
 from subprocess import call
-from utils.bio import read_bio_seqs
+from utils.bio import read_bio_seqs, RC
 from utils.various import fst_iterable
 
 
@@ -143,7 +144,7 @@ class PathMultiKGraph:
         max_edge_index = 0
         vertex_nucl2edgeindex = {}
         for e_id, seq in db.items():
-            index, s, e = [int(x) for x in e_id.split('_')]
+            index, s, e, _, _ = [int(x) for x in e_id.split('_')]
             s = ph[s]
             e = ph[e]
             key = nx_graph.add_edge(s, e)
@@ -258,18 +259,46 @@ class PathMultiKGraph:
             indegree = self.nx_graph.in_degree(u)
             outdegree = self.nx_graph.out_degree(u)
             if indegree >= 2 and outdegree >= 2:
+                # do not process anything at all
                 # self.unresolved.add(u)
+
+                # process only fully resolved vertices
+                # all_ac = self.idb_mappings.get_active_connections()
+                # pairs = set()
+                # for e_in in in_indexes:
+                #     for e_out in out_indexes:
+                #         if (e_in, e_out) in all_ac:
+                #             pairs.add((e_in, e_out))
+                # all_pairs = set((e_in, e_out)
+                #                 for e_in in in_indexes
+                #                 for e_out in out_indexes)
+                # if len(all_pairs - pairs):
+                #     self.unresolved.add(u)
+
+                # initial heuristic
                 all_ac = self.idb_mappings.get_active_connections()
-                pairs = set()
+#                 loops = in_indexes & out_indexes
+#                 if len(loops) == 1:
+#                     loop = fst_iterable(loops)
+#                     rest_in = in_indexes - loops
+#                     rest_out = out_indexes - loops
+#                     if len(rest_in) == 1:
+#                         in_index = fst_iterable(rest_in)
+#                         all_ac.add((in_index, loop))
+#                     if len(rest_out) == 1:
+#                         out_index = fst_iterable(rest_out)
+#                         all_ac.add((loop, out_index))
+
+                paired_in = set()
+                paired_out = set()
                 for e_in in in_indexes:
                     for e_out in out_indexes:
                         if (e_in, e_out) in all_ac:
-                            pairs.add((e_in, e_out))
-                all_pairs = set((e_in, e_out)
-                                for e_in in in_indexes
-                                for e_out in out_indexes)
+                            paired_in.add(e_in)
+                            paired_out.add(e_out)
+                tips = (in_indexes - paired_in) | (out_indexes - paired_out)
 
-                if len(all_pairs - pairs):
+                if len(tips):
                     self.unresolved.add(u)
 
         prev, new = self.unresolved, set()
@@ -356,6 +385,19 @@ class PathMultiKGraph:
                 self.move_edge(*old_edge, *new_edge)
 
             all_ac = self.idb_mappings.get_active_connections()
+
+#             loops = set(in_indexes) & set(out_indexes)
+#             if len(loops) == 1:
+#                 loop = fst_iterable(loops)
+#                 rest_in = set(in_indexes) - loops
+#                 rest_out = set(out_indexes) - loops
+#                 if len(rest_in) == 1:
+#                     in_index = fst_iterable(rest_in)
+#                     all_ac.add((in_index, loop))
+#                 if len(rest_out) == 1:
+#                     out_index = fst_iterable(rest_out)
+#                     all_ac.add((loop, out_index))
+
             ac_s2e = defaultdict(set)
             ac_e2s = defaultdict(set)
             for e_in in in_indexes:
@@ -417,8 +459,6 @@ class PathMultiKGraph:
             process_simple()
 
     def transform_single(self):
-        print(self.unresolved)
-        print(set(self.nx_graph.nodes))
         if self.unresolved == set(self.nx_graph.nodes):
             print('Saturated')
             return True
@@ -441,6 +481,7 @@ class PathMultiKGraph:
         # remove collapsed edges
         [self.remove_edge(index=index) for index in collapsed_edges]
 
+        self.nx_graph.remove_nodes_from(list(nx.isolates(self.nx_graph)))
         self._update_unresolved_vertices()
         self.assert_validity()
         return False
@@ -478,10 +519,11 @@ class PathMultiKGraph:
                     changed = True
         return mult
 
-    def write_dot(self, outfile, ref=None, compact=False, export_pdf=True):
-        mult_est = self.estimate_lower_mult()
+    def write_dot(self, outfile, ref=None, compact=False, export_pdf=True,):
+        # mult_est = self.estimate_lower_mult()
+        mult_est = defaultdict(int)
         if ref is not None:
-            path, iscomplete = self.align_ref(ref)
+            path, iscomplete, _ = self.align_ref(ref)
             mult = Counter(path)
         if outfile[-3:] == 'dot':
             outfile = outfile[:-4]
@@ -494,7 +536,8 @@ class PathMultiKGraph:
             seqlen = len(self.edge2seq[index])
             label = f'index={index}\nlen={seqlen}\nmult_est={mult_est[index]}'
             if ref is not None:
-                assert mult[index] == 0 or mult[index] >= mult_est[index]
+                # print(mult[index], mult_est[index])
+                # assert mult[index] == 0 or mult[index] >= mult_est[index]
                 label += f'\nmult_real={mult[index]}'
             graph.add_edge(*edge,
                            label=label,
@@ -507,10 +550,11 @@ class PathMultiKGraph:
             cmd = ['dot', '-Tpdf', dotfile, '-o', pdffile]
             call(cmd)
 
-    def align_ref(self, ref):
+    def align_ref(self, ref, MAX_TIP_LEN=200000):
         ref = list(ref)
         path = []
         coord = 0
+        coords = defaultdict(list)
         for node in self.nx_graph.nodes():
             in_degree = self.nx_graph.in_degree(node)
             out_degree = self.nx_graph.out_degree(node)
@@ -520,9 +564,16 @@ class PathMultiKGraph:
                 end_nodelen = self.node2len[e_out[1]]
                 out_index = self.edge2index[e_out]
                 seq = self.edge2seq[out_index]
-                if seq == ref[:len(seq)]:
+                alignment = edlib.align(seq, ref, k=0,
+                                        task='locations',
+                                        mode='HW')
+                if len(alignment['locations']) == 1:
                     path.append(out_index)
-                    coord += len(seq) - end_nodelen
+                    st, en = alignment['locations'][0]
+                    en += 1
+                    print(st, en, en - st, len(seq))
+                    coord = en - end_nodelen
+                    coords[out_index].append((st, en))
                     break
         if len(path) == 0:
             return
@@ -541,6 +592,7 @@ class PathMultiKGraph:
                 if c == ref[coord+nodelen]:
                     # print(index)
                     refseq = ref[coord:coord+len(seq)]
+                    seq = seq[:len(refseq)]
                     if refseq != seq:
                         print(path)
                         print(last_index, index)
@@ -555,15 +607,57 @@ class PathMultiKGraph:
                     assert refseq == seq
                     path.append(index)
                     end_nodelen = self.node2len[edge[1]]
+                    old_coord = coord
                     coord += len(seq) - end_nodelen
+                    coords[index].append((old_coord, coord))
                     extended = True
                     break
             if not extended:
                 break
 
-        iscomplete = coord == len(ref) - end_nodelen
-        return path, iscomplete
+        print(len(ref) - end_nodelen - coord)
+        iscomplete = (len(ref) - end_nodelen - coord) < MAX_TIP_LEN
+        return path, iscomplete, coords
 
+    def _get_path(self, list_indexes):
+        if len(list_indexes) == 0:
+            return tuple()
+
+        path = []
+        fst_index = list_indexes[0]
+        path += self.edge2seq[fst_index]
+        for index in list_indexes[1:]:
+            string = self.edge2seq[index]
+            in_node = self.index2edge[index][0]
+            len_node = self.node2len[in_node]
+            assert path[-len_node:] == string[:len_node]
+            path += string[len_node:]
+        return tuple(path)
+
+    def get_paths_for_mappings(self):
+        paths = {}
+        for r_id, mapping in self.idb_mappings.mappings.items():
+            paths[r_id] = self._get_path(mapping)
+        return paths
+
+    def assert_validity_of_paths(self, reads):
+        paths = self.get_paths_for_mappings()
+        # print(set(paths.keys()) - set(reads.keys()))
+        print(set(reads.keys()) - set(paths.keys()))
+        # assert set(paths.keys()) == set(reads.keys())
+        for r_id in paths:
+            if r_id not in reads:
+                continue
+            path = ''.join(paths[r_id])
+            read = reads[r_id]
+            alignment = edlib.align(read, path, k=0, mode='HW')
+            if alignment['editDistance'] == -1:
+                print(r_id)
+                print(len(path), len(read), self.idb_mappings.mappings[r_id])
+                print(path)
+                print(read)
+                print(alignment)
+                break
 
 # class DB1:
 #     k = 3
