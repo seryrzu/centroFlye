@@ -16,9 +16,11 @@ import networkx as nx
 import edlib
 
 from sequence_graph.path_graph import IDBMappings
+from standard_logger import get_logger
 from subprocess import call
 from utils.bio import read_bio_seqs
-from utils.os_utils import smart_makedirs
+from utils.git import get_git_revision_short_hash
+from utils.os_utils import smart_makedirs, expandpath
 from utils.various import fst_iterable
 
 
@@ -181,7 +183,7 @@ class PathMultiKGraph:
         average_cov = sum(edge2cov[index] * len(edge2seq[index])
                           for index in edge2cov) / \
             sum(len(edge2seq[index]) for index in edge2cov)
-        print(average_cov)
+        logger.info(f'Average coverage {average_cov}')
         unique_edges = set([index for index, cov in edge2cov.items()
                             if cov <= average_cov * 1.2])
 
@@ -493,10 +495,8 @@ class PathMultiKGraph:
 
     def transform_single(self):
         if self.unresolved == set(self.nx_graph.nodes):
-            print('Saturated')
             return True
 
-        print(self.niter)
         self.niter += 1
         for u in list(self.nx_graph.nodes):
             if u not in self.unresolved:
@@ -522,7 +522,6 @@ class PathMultiKGraph:
             if (indegree >= 2 and outdegree >= 2) or \
                     (indegree == 0 and outdegree >= 2) or \
                     (indegree >= 2 and outdegree == 0):
-                print(indegree, outdegree, u)
                 n_iter_wo_complex = 0
                 break
             nlen = self.node2len[u]
@@ -610,7 +609,7 @@ class PathMultiKGraph:
             return True
 
         n_iter_wo_complex = self.get_niter_wo_complex()
-        print(self.niter, n_iter_wo_complex)
+        logger.info(f'iter={self.niter}, simple_iter={n_iter_wo_complex}')
 
         self._transform_simple_N(N=n_iter_wo_complex)
         self.transform_single()
@@ -620,7 +619,8 @@ class PathMultiKGraph:
         while self.init_k + self.niter < self.SATURATING_K and \
                 not self.transform_single_fast():
             pass
-        print(f'Saturated, niter={self.niter}, k={self.init_k+self.niter}')
+        K = self.init_k+self.niter
+        logger.info(f'Graph saturated, niter={self.niter}, K={K}')
 
     def estimate_lower_mult(self):
         mult = {edge: 1 for edge in self.index2edge}
@@ -795,6 +795,16 @@ def main():
     parser.add_argument("-o", "--outdir", required=True)
     params = parser.parse_args()
 
+    params.dbg = expandpath(params.dbg)
+    params.outdir = expandpath(params.outdir)
+    smart_makedirs(params.outdir)
+    logfn = os.path.join(params.outdir, 'inc_k.log')
+    global logger
+    logger = get_logger(logfn,
+                        logger_name='centroFlye: inc_k')
+    logger.info(f'cmd: {sys.argv}')
+    logger.info(f'git hash: {get_git_revision_short_hash()}')
+
     db_fn = os.path.join(params.dbg, 'graph.fasta')
     align_fn = os.path.join(params.dbg, 'alignments.txt')
     dbg_log_fn = os.path.join(params.dbg, 'dbg.log')
@@ -804,12 +814,18 @@ def main():
         while cmd[i] != '-k':
             i += 1
         k = int(cmd[i+1]) + 1
+    logger.info(f'init k = {k}')
+    logger.info(f'Reading DBG output from {params.dbg}')
     lpdb = PathMultiKGraph.fromDR(db_fn=db_fn, align_fn=align_fn, k=k)
+    logger.info(f'Finished reading DBG output')
+    logger.info(f'Starting increasing k')
     lpdb.transform_fast_until_saturated()
+    logger.info(f'Finished increasing k')
 
-    smart_makedirs(params.outdir)
     outdot = os.path.join(params.outdir, f'dbg_{k}-{lpdb.init_k+lpdb.niter}')
+    logger.info(f'Writing final graph to {outdot}')
     lpdb.write_dot(outdot, compact=True)
+    logger.info(f'Finished writing final graph')
 
 
 if __name__ == "__main__":
