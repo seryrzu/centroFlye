@@ -3,7 +3,7 @@ import logging
 import unittest
 
 import networkx as nx
-from sequence_graph.sequence_graph import SequenceGraph
+from sequence_graph.seq_graph import SequenceGraph
 from sequence_graph.db_graph import DeBruijnGraph
 
 logger = logging.getLogger("centroFlye.monomers_tests")
