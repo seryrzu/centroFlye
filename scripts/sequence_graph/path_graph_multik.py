@@ -146,7 +146,8 @@ class PathMultiKGraph:
         max_edge_index = 0
         vertex_nucl2edgeindex = {}
         for e_id, seq in db.items():
-            index, s, e, _, _ = [int(x) for x in e_id.split('_')]
+            split_id = [int(x) for x in e_id.split('_')]
+            index, s, e = split_id[:3]
             s = ph[s]
             e = ph[e]
             key = nx_graph.add_edge(s, e)
