@@ -8,7 +8,7 @@ import os
 import networkx as nx
 import numpy as np
 
-from sequence_graph.sequence_graph import SequenceGraph
+from sequence_graph.seq_graph import SequenceGraph
 from utils.os_utils import smart_makedirs
 
 logger = logging.getLogger("centroFlye.sequence_graph.db_graph_comparison")

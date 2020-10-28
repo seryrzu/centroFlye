@@ -9,7 +9,7 @@ import os
 import networkx as nx
 
 from sequence_graph.db_graph import DeBruijnGraph
-from sequence_graph.db_graph_3col import DeBruijnGraph3Color
+import sequence_graph.db_graph_3col
 from utils.kmers import get_kmer_index, \
     def_get_min_mult, def_get_frequent_kmers
 from utils.os_utils import smart_makedirs
@@ -97,9 +97,10 @@ def get_idb(string_set,
             db.pickle_dump(pickle_file)
 
             if assembly is not None:
-                DeBruijnGraph3Color.from_read_db_and_assembly(gr_reads=db,
-                                                              assembly=assembly,
-                                                              outdir=outdir)
+                sequence_graph.db_graph_3col.DeBruijnGraph3Color.\
+                    from_read_db_and_assembly(gr_reads=db,
+                                              assembly=assembly,
+                                              outdir=outdir)
         dbs[k] = db
 
         if k < maxk:

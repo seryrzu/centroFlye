@@ -2,9 +2,15 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
+import argparse
 from collections import defaultdict, Counter
 import logging
 import math
+import os
+import sys
+
+this_dirname = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
 import networkx as nx
 import edlib
@@ -12,6 +18,7 @@ import edlib
 from sequence_graph.path_graph import IDBMappings
 from subprocess import call
 from utils.bio import read_bio_seqs
+from utils.os_utils import smart_makedirs
 from utils.various import fst_iterable
 
 
@@ -779,6 +786,35 @@ class PathMultiKGraph:
                 print(read)
                 print(alignment)
                 break
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--dbg", required=True,
+                        help="Directory with DBG output")
+    parser.add_argument("-o", "--outdir", required=True)
+    params = parser.parse_args()
+
+    db_fn = os.path.join(params.dbg, 'graph.fasta')
+    align_fn = os.path.join(params.dbg, 'alignments.txt')
+    dbg_log_fn = os.path.join(params.dbg, 'dbg.log')
+    with open(dbg_log_fn) as f:
+        cmd = f.readline().strip().split(' ')
+        i = 0
+        while cmd[i] != '-k':
+            i += 1
+        k = int(cmd[i+1]) + 1
+    lpdb = PathMultiKGraph.fromDR(db_fn=db_fn, align_fn=align_fn, k=k)
+    lpdb.transform_fast_until_saturated()
+
+    smart_makedirs(params.outdir)
+    outdot = os.path.join(params.outdir, f'dbg_{k}-{lpdb.init_k+lpdb.niter}')
+    lpdb.write_dot(outdot, compact=True)
+
+
+if __name__ == "__main__":
+    main()
+
 
 # class DB1:
 #     k = 3

@@ -10,7 +10,7 @@ from config.config import config
 import networkx as nx
 import numpy as np
 
-from sequence_graph.sequence_graph import SequenceGraph
+from sequence_graph.seq_graph import SequenceGraph
 
 
 logger = logging.getLogger("centroFlye.sequence_graph.db_graph")
