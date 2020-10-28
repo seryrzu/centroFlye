@@ -19,12 +19,13 @@ logger = logging.getLogger("centroFlye.sequence_graph.path_graph_multik")
 
 
 class PathMultiKGraph:
-    MAX_K = 30000
+    SATURATING_K = 30000
     def __init__(self, nx_graph,
                  edge2seq, edge2index, index2edge, node2len,
                  max_edge_index, max_node_index,
                  idb_mappings,
-                 init_k):
+                 init_k,
+                 unique_edges=None):
         self.nx_graph = nx_graph
         self.edge2seq = edge2seq
         self.edge2index = edge2index
@@ -34,6 +35,9 @@ class PathMultiKGraph:
         self.max_node_index = max_node_index
         self.idb_mappings = idb_mappings
         self.init_k = init_k
+        if unique_edges is None:
+            unique_edges = set()
+        self.unique_edges = unique_edges
 
         self.niter = 0
 
@@ -145,9 +149,12 @@ class PathMultiKGraph:
         ph = PerfectHash()
         max_edge_index = 0
         vertex_nucl2edgeindex = {}
+        edge2cov = {}
         for e_id, seq in db.items():
-            split_id = [int(x) for x in e_id.split('_')]
-            index, s, e = split_id[:3]
+            split_id = e_id.split('_')
+            index, s, e, _, cov = split_id
+            index, s, e = int(index), int(s), int(e)
+            cov = float(cov)
             s = ph[s]
             e = ph[e]
             key = nx_graph.add_edge(s, e)
@@ -155,12 +162,19 @@ class PathMultiKGraph:
             edge2seq[index] = list(seq)
             edge2index[edge] = index
             index2edge[index] = edge
+            edge2cov[index] = cov
             max_edge_index = max(index, max_edge_index)
             vertex_nucl2edgeindex[(s, seq[k-1])] = index
             node2len[s] = k - 1
             node2len[e] = k - 1
 
         max_edge_index += 1
+
+        average_cov = sum(edge2cov[index] * len(edge2seq[index])
+                          for index in edge2cov) / \
+                      sum(len(edge2seq[index]) for index in edge2cov)
+        unique_edges = set([index for index, cov in edge2cov.items()
+                            if cov <= average_cov * 1.2])
 
         mappings = {}
         with open(align_fn) as f:
@@ -184,7 +198,8 @@ class PathMultiKGraph:
                    max_edge_index=max_edge_index,
                    max_node_index=ph.next_key,
                    init_k=k,
-                   idb_mappings=idb_mappings)
+                   idb_mappings=idb_mappings,
+                   unique_edges=unique_edges)
 
     def move_edge(self, e1_st, e1_en, e1_key,
                   e2_st, e2_en, e2_key=None):
@@ -209,6 +224,8 @@ class PathMultiKGraph:
         del self.index2edge[index]
         del self.edge2seq[index]
 
+        self.unique_edges.discard(index)
+
         if moving:
             for e in list(self.nx_graph.in_edges(edge[1], keys=True)):
                 self.move_edge(*e, e[0], edge[0])
@@ -228,6 +245,8 @@ class PathMultiKGraph:
         i = self.edge2index[e1]
         j = self.edge2index[e2]
         self.idb_mappings.merge(i, j)
+        if j in self.unique_edges:
+            self.unique_edges.add(i)
         in_seq = self.edge2seq[i]
         out_seq = self.edge2seq[j]
         nlen = self.node2len[e2[0]]-1  # need -1 since new nodes have ++
@@ -280,17 +299,18 @@ class PathMultiKGraph:
 
                 # initial heuristic
                 all_ac = self.idb_mappings.get_active_connections()
-#                 loops = in_indexes & out_indexes
-#                 if len(loops) == 1:
-#                     loop = fst_iterable(loops)
-#                     rest_in = in_indexes - loops
-#                     rest_out = out_indexes - loops
-#                     if len(rest_in) == 1:
-#                         in_index = fst_iterable(rest_in)
-#                         all_ac.add((in_index, loop))
-#                     if len(rest_out) == 1:
-#                         out_index = fst_iterable(rest_out)
-#                         all_ac.add((loop, out_index))
+                loops = in_indexes & out_indexes
+                if len(loops) == 1:
+                    loop = fst_iterable(loops)
+                    if loop in self.unique_edges:
+                        rest_in = in_indexes - loops
+                        rest_out = out_indexes - loops
+                        if len(rest_in) == 1:
+                            in_index = fst_iterable(rest_in)
+                            all_ac.add((in_index, loop))
+                        if len(rest_out) == 1:
+                            out_index = fst_iterable(rest_out)
+                            all_ac.add((loop, out_index))
 
                 paired_in = set()
                 paired_out = set()
@@ -389,17 +409,18 @@ class PathMultiKGraph:
 
             all_ac = self.idb_mappings.get_active_connections()
 
-#             loops = set(in_indexes) & set(out_indexes)
-#             if len(loops) == 1:
-#                 loop = fst_iterable(loops)
-#                 rest_in = set(in_indexes) - loops
-#                 rest_out = set(out_indexes) - loops
-#                 if len(rest_in) == 1:
-#                     in_index = fst_iterable(rest_in)
-#                     all_ac.add((in_index, loop))
-#                 if len(rest_out) == 1:
-#                     out_index = fst_iterable(rest_out)
-#                     all_ac.add((loop, out_index))
+            loops = set(in_indexes) & set(out_indexes)
+            if len(loops) == 1:
+                loop = fst_iterable(loops)
+                if loop in self.unique_edges:
+                    rest_in = set(in_indexes) - loops
+                    rest_out = set(out_indexes) - loops
+                    if len(rest_in) == 1:
+                        in_index = fst_iterable(rest_in)
+                        all_ac.add((in_index, loop))
+                    if len(rest_out) == 1:
+                        out_index = fst_iterable(rest_out)
+                        all_ac.add((loop, out_index))
 
             ac_s2e = defaultdict(set)
             ac_e2s = defaultdict(set)
@@ -587,7 +608,7 @@ class PathMultiKGraph:
         return False
 
     def transform_fast_until_saturated(self):
-        while self.init_k + self.niter < self.MAX_K and \
+        while self.init_k + self.niter < self.SATURATING_K and \
                 not self.transform_single_fast():
             pass
         print(f'Saturated, niter={self.niter}, k={self.init_k+self.niter}')
