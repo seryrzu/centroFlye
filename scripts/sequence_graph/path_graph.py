@@ -23,6 +23,16 @@ class IDBMappings:
     def __init__(self, mappings):
         # mappings = filter_sublsts_n2_dict(mappings)
         self.mappings = mappings
+        self.resolved_mappings = {}
+
+    def update_resolved(self):
+        saved = []
+        for r_id, mapping in self.mappings.items():
+            if len(mapping) <= 1:
+                self.resolved_mappings[r_id] = mapping
+            else:
+                saved.append(r_id)
+        self.mappings = {r_id: self.mappings[r_id] for r_id in saved}
 
     def add(self, st, en, new):
         for r_id, mapping in self.mappings.items():
@@ -37,10 +47,12 @@ class IDBMappings:
             new_mapping.append(mapping[additions[-1]:])
             new_mapping = list(itertools.chain.from_iterable(new_mapping))
             self.mappings[r_id] = new_mapping
+        self.update_resolved()
 
     def remove(self, edge):
         for r_id, mapping in self.mappings.items():
             self.mappings[r_id] = list(filter(lambda e: e != edge, mapping))
+        self.update_resolved()
 
     def merge(self, st, en):
         # merge en into st
@@ -55,6 +67,11 @@ class IDBMappings:
             for a, b in zip(mapping, mapping[1:]):
                 ac.add((a, b))
         return ac
+
+    def get_mappings(self, r_id):
+        if r_id in self.mappings:
+            return self.mappings[r_id]
+        return self.resolved_mappings[r_id]
 
 
 class LightPathDeBruijnGraph:
@@ -466,7 +483,7 @@ assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: [2]}
 lightdb.increase_k_by_one()
 assert [(edge, lightdb.edge2index[edge])
         for edge in lightdb.nx_graph.edges] == [((0, 1, 0), 0), ((4, 2, 0), 1)]
-assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: []}
+assert lightdb.idb_mappings.resolved_mappings == {0: [0], 1: [1], 2: []}
 
 
 # graph ending vertex
@@ -487,7 +504,7 @@ assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: [2]}
 lightdb.increase_k_by_one()
 assert [(edge, lightdb.edge2index[edge])
         for edge in lightdb.nx_graph.edges] == [((0, 3, 0), 0), ((1, 4, 0), 1)]
-assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: []}
+assert lightdb.idb_mappings.resolved_mappings == {0: [0], 1: [1], 2: []}
 
 
 # graph 1-in >1-out
