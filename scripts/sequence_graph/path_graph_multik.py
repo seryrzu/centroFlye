@@ -11,7 +11,7 @@ import edlib
 
 from sequence_graph.path_graph import IDBMappings
 from subprocess import call
-from utils.bio import read_bio_seqs, RC
+from utils.bio import read_bio_seqs
 from utils.various import fst_iterable
 
 
@@ -20,6 +20,7 @@ logger = logging.getLogger("centroFlye.sequence_graph.path_graph_multik")
 
 class PathMultiKGraph:
     SATURATING_K = 30000
+
     def __init__(self, nx_graph,
                  edge2seq, edge2index, index2edge, node2len,
                  max_edge_index, max_node_index,
@@ -172,7 +173,8 @@ class PathMultiKGraph:
 
         average_cov = sum(edge2cov[index] * len(edge2seq[index])
                           for index in edge2cov) / \
-                      sum(len(edge2seq[index]) for index in edge2cov)
+            sum(len(edge2seq[index]) for index in edge2cov)
+        print(average_cov)
         unique_edges = set([index for index, cov in edge2cov.items()
                             if cov <= average_cov * 1.2])
 
@@ -518,9 +520,9 @@ class PathMultiKGraph:
                 break
             nlen = self.node2len[u]
             in_indexes = [self.edge2index[e_in]
-                        for e_in in self.nx_graph.in_edges(u, keys=True)]
+                          for e_in in self.nx_graph.in_edges(u, keys=True)]
             out_indexes = [self.edge2index[e_out]
-                        for e_out in self.nx_graph.out_edges(u, keys=True)]
+                           for e_out in self.nx_graph.out_edges(u, keys=True)]
             if indegree == 1:
                 index = in_indexes[0]
                 fin_node = self.index2edge[index][0]
@@ -543,9 +545,9 @@ class PathMultiKGraph:
             if u in self.unresolved:
                 continue
             in_indexes = [self.edge2index[e_in]
-                        for e_in in self.nx_graph.in_edges(u, keys=True)]
+                          for e_in in self.nx_graph.in_edges(u, keys=True)]
             out_indexes = [self.edge2index[e_out]
-                        for e_out in self.nx_graph.out_edges(u, keys=True)]
+                           for e_out in self.nx_graph.out_edges(u, keys=True)]
 
             indegree = self.nx_graph.in_degree(u)
             outdegree = self.nx_graph.out_degree(u)
