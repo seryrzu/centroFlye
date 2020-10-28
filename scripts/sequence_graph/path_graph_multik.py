@@ -2,8 +2,9 @@
 # This file is a part of centroFlye program.
 # Released under the BSD license (see LICENSE file)
 
-import logging
 from collections import defaultdict, Counter
+import logging
+import math
 
 import networkx as nx
 import edlib
@@ -18,6 +19,7 @@ logger = logging.getLogger("centroFlye.sequence_graph.path_graph_multik")
 
 
 class PathMultiKGraph:
+    MAX_K = 30000
     def __init__(self, nx_graph,
                  edge2seq, edge2index, index2edge, node2len,
                  max_edge_index, max_node_index,
@@ -468,7 +470,94 @@ class PathMultiKGraph:
         for u in list(self.nx_graph.nodes):
             if u not in self.unresolved:
                 self.__process_vertex(u)
+        self.finalize_transformation()
+        return False
 
+    def transform(self, N):
+        for _ in range(N):
+            self.transform_single()
+
+    def transform_until_saturated(self):
+        while not self.transform_single():
+            pass
+
+    def get_niter_wo_complex(self):
+        n_iter_wo_complex = math.inf
+        for u in list(self.nx_graph.nodes):
+            if u in self.unresolved:
+                continue
+            indegree = self.nx_graph.in_degree(u)
+            outdegree = self.nx_graph.out_degree(u)
+            if (indegree >= 2 and outdegree >= 2) or \
+                    (indegree == 0 and outdegree >= 2) or \
+                    (indegree >= 2 and outdegree == 0):
+                print(indegree, outdegree, u)
+                n_iter_wo_complex = 0
+                break
+            nlen = self.node2len[u]
+            in_indexes = [self.edge2index[e_in]
+                        for e_in in self.nx_graph.in_edges(u, keys=True)]
+            out_indexes = [self.edge2index[e_out]
+                        for e_out in self.nx_graph.out_edges(u, keys=True)]
+            if indegree == 1:
+                index = in_indexes[0]
+                fin_node = self.index2edge[index][0]
+            elif outdegree == 1:
+                index = out_indexes[0]
+                fin_node = self.index2edge[index][1]
+            else:
+                assert False
+            seq = self.edge2seq[index]
+            n_iter_node = len(seq) - nlen
+            if fin_node in self.unresolved:
+                n_iter_node -= 1
+            n_iter_wo_complex = min(n_iter_wo_complex, n_iter_node)
+        return n_iter_wo_complex
+
+    def _transform_simple_N(self, N):
+        if N == 0:
+            return
+        for u in list(self.nx_graph.nodes):
+            if u in self.unresolved:
+                continue
+            in_indexes = [self.edge2index[e_in]
+                        for e_in in self.nx_graph.in_edges(u, keys=True)]
+            out_indexes = [self.edge2index[e_out]
+                        for e_out in self.nx_graph.out_edges(u, keys=True)]
+
+            indegree = self.nx_graph.in_degree(u)
+            outdegree = self.nx_graph.out_degree(u)
+            nlen = self.node2len[u]
+            if indegree == 0 and outdegree == 1:
+                pass
+            elif indegree == 1 and outdegree == 0:
+                pass
+            elif indegree == 1 and outdegree > 1:
+                # simple 1-in vertex
+                assert len(in_indexes) == 1
+                in_index = in_indexes[0]
+                in_seq = self.edge2seq[in_index]
+                prefix = in_seq[-nlen-N:-nlen]
+                for j in out_indexes:
+                    assert self.edge2seq[j][:nlen] == in_seq[-nlen:]
+                    self.edge2seq[j] = prefix + self.edge2seq[j]
+
+            elif indegree > 1 and outdegree == 1:
+                # simple 1-out vertex
+                assert len(out_indexes) == 1
+                out_index = out_indexes[0]
+                out_seq = self.edge2seq[out_index]
+                suffix = out_seq[nlen:nlen+N]
+                for i in in_indexes:
+                    assert self.edge2seq[i][-nlen:] == out_seq[:nlen]
+                    self.edge2seq[i] += suffix
+            else:
+                assert False
+            self.node2len[u] += N
+        self.niter += N
+        self.finalize_transformation()
+
+    def finalize_transformation(self):
         collapsed_edges = []
         for edge in self.nx_graph.edges:
             index = self.edge2index[edge]
@@ -484,15 +573,23 @@ class PathMultiKGraph:
         self.nx_graph.remove_nodes_from(list(nx.isolates(self.nx_graph)))
         self._update_unresolved_vertices()
         self.assert_validity()
+
+    def transform_single_fast(self):
+        if self.unresolved == set(self.nx_graph.nodes):
+            return True
+
+        n_iter_wo_complex = self.get_niter_wo_complex()
+        print(self.niter, n_iter_wo_complex)
+
+        self._transform_simple_N(N=n_iter_wo_complex)
+        self.transform_single()
         return False
 
-    def transform(self, N):
-        for _ in range(N):
-            self.transform_single()
-
-    def transform_until_saturated(self):
-        while not self.transform_single():
+    def transform_fast_until_saturated(self):
+        while self.init_k + self.niter < self.MAX_K and \
+                not self.transform_single_fast():
             pass
+        print(f'Saturated, niter={self.niter}, k={self.init_k+self.niter}')
 
     def estimate_lower_mult(self):
         mult = {edge: 1 for edge in self.index2edge}
