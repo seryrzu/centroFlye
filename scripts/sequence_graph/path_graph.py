@@ -7,6 +7,7 @@ from collections import defaultdict
 import itertools
 import os
 
+from llist import dllist
 import networkx as nx
 import numpy as np
 
@@ -21,56 +22,99 @@ logger = logging.getLogger("centroFlye.sequence_graph.path_graph")
 
 class IDBMappings:
     def __init__(self, mappings):
-        # mappings = filter_sublsts_n2_dict(mappings)
-        self.mappings = mappings
+        self.mappings = {}
         self.resolved_mappings = {}
+        for r_id, mapping in mappings.items():
+            if len(mapping) > 1:
+                self.mappings[r_id] = dllist(mapping)
+            else:
+                self.resolved_mappings[r_id] = mapping
+
+        index2pos = defaultdict(set)
+        for r_id, mapping in self.mappings.items():
+            node = mapping.first
+            while node is not None:
+                index2pos[node.value].add((r_id, node))
+                node = node.next
+
+        pairindex2pos = defaultdict(set)
+        for r_id, mapping in self.mappings.items():
+            s = mapping.first
+            if s is None:
+                continue
+            t = s.next
+            while t is not None:
+                pairindex2pos[(s.value, t.value)].add((r_id, s))
+                s, t = t, t.next
+
+        self.index2pos = index2pos
+        self.pairindex2pos = pairindex2pos
 
     def update_resolved(self):
         saved = []
         for r_id, mapping in self.mappings.items():
             if len(mapping) <= 1:
-                self.resolved_mappings[r_id] = mapping
+                if len(mapping) == 1:
+                    self.index2pos[mapping.first.value].remove(
+                        (r_id, mapping.first)
+                    )
+                self.resolved_mappings[r_id] = list(mapping)
             else:
                 saved.append(r_id)
         self.mappings = {r_id: self.mappings[r_id] for r_id in saved}
 
     def add(self, st, en, new):
-        for r_id, mapping in self.mappings.items():
-            additions = [0]
-            for i, a, b in zip(itertools.count(), mapping, mapping[1:]):
-                if a == st and b == en:
-                    additions.append(i+1)
-            new_mapping = []
-            for p1, p2 in zip(additions, additions[1:]):
-                new_mapping.append(mapping[p1:p2])
-                new_mapping.append([new])
-            new_mapping.append(mapping[additions[-1]:])
-            new_mapping = list(itertools.chain.from_iterable(new_mapping))
-            self.mappings[r_id] = new_mapping
-        self.update_resolved()
+        for r_id, s in self.pairindex2pos[(st, en)]:
+            e = s.next
+            n = self.mappings[r_id].insert(new, e)
+            self.index2pos[new].add((r_id, n))
+            self.pairindex2pos[(st, new)].add((r_id, s))
+            self.pairindex2pos[(new, en)].add((r_id, n))
+        del self.pairindex2pos[(st, en)]
 
     def remove(self, edge):
-        for r_id, mapping in self.mappings.items():
-            self.mappings[r_id] = list(filter(lambda e: e != edge, mapping))
-        self.update_resolved()
+        for r_id, s in self.index2pos[edge]:
+            p = s.prev
+            n = s.next
+            self.mappings[r_id].remove(s)
+            if p is not None:
+                self.pairindex2pos[(p.value, edge)].remove((r_id, p))
+                if len(self.pairindex2pos[(p.value, edge)]) == 0:
+                    del self.pairindex2pos[(p.value, edge)]
+            if n is not None:
+                self.pairindex2pos[(edge, n.value)].remove((r_id, s))
+                if len(self.pairindex2pos[(edge, n.value)]) == 0:
+                    del self.pairindex2pos[(edge, n.value)]
+            if p is not None and n is not None:
+                self.pairindex2pos[(p.value, n.value)].add((r_id, p))
+        del self.index2pos[edge]
 
     def merge(self, st, en):
         # merge en into st
-        for r_id, mapping in self.mappings.items():
-            if len(mapping) and mapping[0] == en:
-                self.mappings[r_id][0] = st
+        keep = set()
+        for r_id, s in self.index2pos[en]:
+            if s.prev is None:
+                t = s.next
+                if t is not None:
+                    self.pairindex2pos[(en, t.value)].remove((r_id, s))
+                    if len(self.pairindex2pos[(en, t.value)]) == 0:
+                        del self.pairindex2pos[(en, t.value)]
+                self.mappings[r_id].popleft()
+                n = self.mappings[r_id].appendleft(st)
+                self.index2pos[st].add((r_id, n))
+                if t is not None:
+                    self.pairindex2pos[(st, t.value)].add((r_id, n))
+            else:
+                keep.add((r_id, s))
+        self.index2pos[en] = keep
         self.remove(en)
 
     def get_active_connections(self):
-        ac = set()
-        for mapping in self.mappings.values():
-            for a, b in zip(mapping, mapping[1:]):
-                ac.add((a, b))
-        return ac
+        return set(self.pairindex2pos.keys())
 
     def get_mappings(self, r_id):
         if r_id in self.mappings:
-            return self.mappings[r_id]
+            return list(self.mappings[r_id])
         return self.resolved_mappings[r_id]
 
 
@@ -479,11 +523,11 @@ lightdb = LightPathDeBruijnGraph.fromDB(DBStVertex(),
                                         raw_mappings={0: ([(0, 1, 0)], 0, 0),
                                                       1: ([(0, 2, 0)], 0, 0),
                                                       2: ([(0, 3, 0)], 0, 0)})
-assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: [2]}
+assert lightdb.idb_mappings.mappings == {} # {0: [0], 1: [1], 2: [2]}
 lightdb.increase_k_by_one()
 assert [(edge, lightdb.edge2index[edge])
         for edge in lightdb.nx_graph.edges] == [((0, 1, 0), 0), ((4, 2, 0), 1)]
-assert lightdb.idb_mappings.resolved_mappings == {0: [0], 1: [1], 2: []}
+assert lightdb.idb_mappings.resolved_mappings == {0: [0], 1: [1], 2: [2]}
 
 
 # graph ending vertex
@@ -500,11 +544,11 @@ lightdb = LightPathDeBruijnGraph.fromDB(DBEnVertex(),
                                         raw_mappings={0: ([(0, 3, 0)], 0, 0),
                                                       1: ([(1, 3, 0)], 0, 0),
                                                       2: ([(2, 3, 0)], 0, 0)})
-assert lightdb.idb_mappings.mappings == {0: [0], 1: [1], 2: [2]}
+assert lightdb.idb_mappings.mappings == {} # {0: [0], 1: [1], 2: [2]}
 lightdb.increase_k_by_one()
 assert [(edge, lightdb.edge2index[edge])
         for edge in lightdb.nx_graph.edges] == [((0, 3, 0), 0), ((1, 4, 0), 1)]
-assert lightdb.idb_mappings.resolved_mappings == {0: [0], 1: [1], 2: []}
+assert lightdb.idb_mappings.resolved_mappings == {0: [0], 1: [1], 2: [2]}
 
 
 # graph 1-in >1-out
