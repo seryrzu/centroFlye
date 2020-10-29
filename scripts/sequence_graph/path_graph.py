@@ -4,7 +4,6 @@
 
 import logging
 from collections import defaultdict
-import itertools
 import os
 
 from llist import dllist
@@ -13,15 +12,16 @@ import numpy as np
 
 from sequence_graph.db_graph import DeBruijnGraph
 from sequence_graph.db_graph_3col import DeBruijnGraph3Color
-from utils.bio import read_bio_seqs, RC
+from utils.bio import read_bio_seqs
 from utils.os_utils import smart_makedirs
-from utils.various import filter_sublsts_n2_dict, fst_iterable
+from utils.various import fst_iterable
 
 logger = logging.getLogger("centroFlye.sequence_graph.path_graph")
 
 
 class IDBMappings:
     def __init__(self, mappings):
+        # mappings = filter_sublsts_n2_dict(mappings)
         self.mappings = {}
         self.resolved_mappings = {}
         for r_id, mapping in mappings.items():
@@ -439,7 +439,7 @@ class LightPathDeBruijnGraph:
                     out_seq = self.edge2seq[e_outdex]
                     inkmer = in_seq[-self.k+1:]
                     outkmer = out_seq[:self.k-1]
-                    assert inkmer == outkmer# or inkmer == RC(outkmer)
+                    assert inkmer == outkmer  # or inkmer == RC(outkmer)
 
     def increase_k_by_one(self):
         for u in list(self.nx_graph.nodes):
@@ -523,7 +523,7 @@ lightdb = LightPathDeBruijnGraph.fromDB(DBStVertex(),
                                         raw_mappings={0: ([(0, 1, 0)], 0, 0),
                                                       1: ([(0, 2, 0)], 0, 0),
                                                       2: ([(0, 3, 0)], 0, 0)})
-assert lightdb.idb_mappings.mappings == {} # {0: [0], 1: [1], 2: [2]}
+assert lightdb.idb_mappings.mappings == {}  # {0: [0], 1: [1], 2: [2]}
 lightdb.increase_k_by_one()
 assert [(edge, lightdb.edge2index[edge])
         for edge in lightdb.nx_graph.edges] == [((0, 1, 0), 0), ((4, 2, 0), 1)]
@@ -544,7 +544,7 @@ lightdb = LightPathDeBruijnGraph.fromDB(DBEnVertex(),
                                         raw_mappings={0: ([(0, 3, 0)], 0, 0),
                                                       1: ([(1, 3, 0)], 0, 0),
                                                       2: ([(2, 3, 0)], 0, 0)})
-assert lightdb.idb_mappings.mappings == {} # {0: [0], 1: [1], 2: [2]}
+assert lightdb.idb_mappings.mappings == {}  # {0: [0], 1: [1], 2: [2]}
 lightdb.increase_k_by_one()
 assert [(edge, lightdb.edge2index[edge])
         for edge in lightdb.nx_graph.edges] == [((0, 3, 0), 0), ((1, 4, 0), 1)]
