@@ -309,25 +309,11 @@ class PathMultiKGraph:
                 #     self.unresolved.add(u)
 
                 # initial heuristic
-                all_ac = self.idb_mappings.get_active_connections()
-                loops = in_indexes & out_indexes
-                if len(loops) == 1:
-                    loop = fst_iterable(loops)
-                    if loop in self.unique_edges:
-                        rest_in = in_indexes - loops
-                        rest_out = out_indexes - loops
-                        if len(rest_in) == 1:
-                            in_index = fst_iterable(rest_in)
-                            all_ac.add((in_index, loop))
-                        if len(rest_out) == 1:
-                            out_index = fst_iterable(rest_out)
-                            all_ac.add((loop, out_index))
-
                 paired_in = set()
                 paired_out = set()
                 for e_in in in_indexes:
                     for e_out in out_indexes:
-                        if (e_in, e_out) in all_ac:
+                        if (e_in, e_out) in self.idb_mappings.pairindex2pos:
                             paired_in.add(e_in)
                             paired_out.add(e_out)
                 tips = (in_indexes - paired_in) | (out_indexes - paired_out)
@@ -418,7 +404,13 @@ class PathMultiKGraph:
                 new_edge = (self.get_new_vertex_index(), old_edge[1], 0)
                 self.move_edge(*old_edge, *new_edge)
 
-            all_ac = self.idb_mappings.get_active_connections()
+            ac_s2e = defaultdict(set)
+            ac_e2s = defaultdict(set)
+            for e_in in in_indexes:
+                for e_out in out_indexes:
+                    if (e_in, e_out) in self.idb_mappings.pairindex2pos:
+                        ac_s2e[e_in].add(e_out)
+                        ac_e2s[e_out].add(e_in)
 
             loops = set(in_indexes) & set(out_indexes)
             if len(loops) == 1:
@@ -428,18 +420,12 @@ class PathMultiKGraph:
                     rest_out = set(out_indexes) - loops
                     if len(rest_in) == 1:
                         in_index = fst_iterable(rest_in)
-                        all_ac.add((in_index, loop))
+                        ac_s2e[in_index].add(loop)
+                        ac_e2s[loop].add(in_index)
                     if len(rest_out) == 1:
                         out_index = fst_iterable(rest_out)
-                        all_ac.add((loop, out_index))
-
-            ac_s2e = defaultdict(set)
-            ac_e2s = defaultdict(set)
-            for e_in in in_indexes:
-                for e_out in out_indexes:
-                    if (e_in, e_out) in all_ac:
-                        ac_s2e[e_in].add(e_out)
-                        ac_e2s[e_out].add(e_in)
+                        ac_s2e[loop].add(out_index)
+                        ac_e2s[out_index].add(loop)
 
             merged = {}
             for i in ac_s2e:
@@ -506,6 +492,7 @@ class PathMultiKGraph:
 
     def transform(self, N):
         for _ in range(N):
+            print(self.init_k + self.niter)
             self.transform_single()
 
     def transform_until_saturated(self):
@@ -602,7 +589,7 @@ class PathMultiKGraph:
 
         self.nx_graph.remove_nodes_from(list(nx.isolates(self.nx_graph)))
         self._update_unresolved_vertices()
-        self.assert_validity()
+        # self.assert_validity()
 
     def transform_single_fast(self):
         if self.unresolved == set(self.nx_graph.nodes):
@@ -611,14 +598,17 @@ class PathMultiKGraph:
         n_iter_wo_complex = self.get_niter_wo_complex()
         logger.info(f'iter={self.niter}, simple_iter={n_iter_wo_complex}')
 
-        self._transform_simple_N(N=n_iter_wo_complex)
-        self.transform_single()
+        if n_iter_wo_complex > 0:
+            self._transform_simple_N(N=n_iter_wo_complex)
+        else:
+            self.transform_single()
         return False
 
     def transform_fast_until_saturated(self):
         while self.init_k + self.niter < self.SATURATING_K and \
                 not self.transform_single_fast():
             pass
+        self.assert_validity()
         K = self.init_k+self.niter
         logger.info(f'Graph saturated, niter={self.niter}, K={K}')
 
