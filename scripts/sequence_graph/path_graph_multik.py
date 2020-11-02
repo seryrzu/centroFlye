@@ -654,8 +654,6 @@ class PathMultiKGraph:
         return mult
 
     def write_dot(self, outfile, ref=None, compact=False, export_pdf=True,):
-        # mult_est = self.estimate_lower_mult()
-        mult_est = defaultdict(int)
         if ref is not None:
             path, iscomplete, _ = self.align_ref(ref)
             mult = Counter(path)
@@ -668,7 +666,7 @@ class PathMultiKGraph:
             index = self.edge2index[edge]
             seq = self.edge2seq[index] if not compact else None
             seqlen = len(self.edge2seq[index])
-            label = f'index={index}\nlen={seqlen}\nmult_est={mult_est[index]}'
+            label = f'index={index}\nlen={seqlen}'
             if ref is not None:
                 # print(mult[index], mult_est[index])
                 # assert mult[index] == 0 or mult[index] >= mult_est[index]
