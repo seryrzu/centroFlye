@@ -823,6 +823,8 @@ def main():
     logger.info(f'init k = {k}')
     logger.info(f'Reading DBG output from {params.dbg}')
     lpdb = PathMultiKGraph.fromDR(db_fn=db_fn, align_fn=align_fn, k=k)
+    logger.info(f'# vertices = {nx.number_of_nodes(lpdb.nx_graph)}')
+    logger.info(f'# edges = {nx.number_of_edges(lpdb.nx_graph)}')
     logger.info(f'Finished reading DBG output')
     logger.info(f'Starting increasing k')
     lpdb.transform_fast_until_saturated()
