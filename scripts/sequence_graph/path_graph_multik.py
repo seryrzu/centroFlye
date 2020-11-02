@@ -829,6 +829,8 @@ def main():
     logger.info(f'Starting increasing k')
     lpdb.transform_fast_until_saturated()
     logger.info(f'Finished increasing k')
+    logger.info(f'# vertices = {nx.number_of_nodes(lpdb.nx_graph)}')
+    logger.info(f'# edges = {nx.number_of_edges(lpdb.nx_graph)}')
 
     outdot = os.path.join(params.outdir, f'dbg_{k}-{lpdb.init_k+lpdb.niter}')
     logger.info(f'Writing final graph to {outdot}')
