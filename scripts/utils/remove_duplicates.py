@@ -1,4 +1,10 @@
 from argparse import ArgumentParser
+import os
+import sys
+
+this_dirname = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(this_dirname, os.path.pardir))
+
 from bio import read_bio_seqs, write_bio_seqs
 
 
