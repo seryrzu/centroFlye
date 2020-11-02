@@ -28,7 +28,7 @@ logger = logging.getLogger("centroFlye.sequence_graph.path_graph_multik")
 
 
 class PathMultiKGraph:
-    SATURATING_K = 30000
+    SATURATING_K = 40002
 
     def __init__(self, nx_graph,
                  edge2seq, edge2index, index2edge, node2len,
@@ -311,6 +311,20 @@ class PathMultiKGraph:
                 # initial heuristic
                 paired_in = set()
                 paired_out = set()
+                loops = in_indexes & out_indexes
+                if len(loops) == 1:
+                    loop = fst_iterable(loops)
+                    if loop in self.unique_edges:
+                        rest_in = in_indexes - loops
+                        rest_out = out_indexes - loops
+                        if len(rest_in) == 1:
+                            in_index = fst_iterable(rest_in)
+                            paired_in.add(in_index)
+                            paired_out.add(loop)
+                        if len(rest_out) == 1:
+                            out_index = fst_iterable(rest_out)
+                            paired_in.add(loop)
+                            paired_out.add(out_index)
                 for e_in in in_indexes:
                     for e_out in out_indexes:
                         if (e_in, e_out) in self.idb_mappings.pairindex2pos:
@@ -492,7 +506,6 @@ class PathMultiKGraph:
 
     def transform(self, N):
         for _ in range(N):
-            print(self.init_k + self.niter)
             self.transform_single()
 
     def transform_until_saturated(self):
@@ -529,6 +542,9 @@ class PathMultiKGraph:
             if fin_node in self.unresolved:
                 n_iter_node -= 1
             n_iter_wo_complex = min(n_iter_wo_complex, n_iter_node)
+        n_iter_wo_complex = min(n_iter_wo_complex,
+                                self.SATURATING_K - self.init_k - self.niter)
+        # k + n + N == K => N = K - k - n
         return n_iter_wo_complex
 
     def _transform_simple_N(self, N):
