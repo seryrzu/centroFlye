@@ -18,7 +18,7 @@ import edlib
 from sequence_graph.path_graph import IDBMappings
 from standard_logger import get_logger
 from subprocess import call
-from utils.bio import read_bio_seqs
+from utils.bio import read_bio_seqs, read_bio_seq, compress_homopolymer
 from utils.git import get_git_revision_short_hash
 from utils.os_utils import smart_makedirs, expandpath
 from utils.various import fst_iterable
@@ -653,8 +653,10 @@ class PathMultiKGraph:
                     changed = True
         return mult
 
-    def write_dot(self, outfile, ref=None, compact=False, export_pdf=True,):
-        if ref is not None:
+    def write_dot(self, outfile, reffn=None, compact=False, export_pdf=True,):
+        if reffn is not None:
+            ref = read_bio_seq(reffn)
+            ref = compress_homopolymer(ref)
             path, iscomplete, _ = self.align_ref(ref)
             mult = Counter(path)
         if outfile[-3:] == 'dot':
@@ -667,7 +669,7 @@ class PathMultiKGraph:
             seq = self.edge2seq[index] if not compact else None
             seqlen = len(self.edge2seq[index])
             label = f'index={index}\nlen={seqlen}'
-            if ref is not None:
+            if reffn is not None:
                 # print(mult[index], mult_est[index])
                 # assert mult[index] == 0 or mult[index] >= mult_est[index]
                 label += f'\nmult_real={mult[index]}'
@@ -797,6 +799,7 @@ def main():
     parser.add_argument("-i", "--dbg", required=True,
                         help="Directory with DBG output")
     parser.add_argument("-o", "--outdir", required=True)
+    parser.add_argument("--ref")
     params = parser.parse_args()
 
     params.dbg = expandpath(params.dbg)
@@ -832,7 +835,7 @@ def main():
 
     outdot = os.path.join(params.outdir, f'dbg_{k}-{lpdb.init_k+lpdb.niter}')
     logger.info(f'Writing final graph to {outdot}')
-    lpdb.write_dot(outdot, compact=True)
+    lpdb.write_dot(outdot, compact=True, reffn=params.ref)
     logger.info(f'Finished writing final graph')
 
 
