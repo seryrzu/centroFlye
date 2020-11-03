@@ -109,9 +109,8 @@ def main():
     plt.plot(min_filter1d_valid(surv, W=W))
 
     plt.xlabel('reference')
-    plt.ylabel('substring length')
-    plt.title('Assembly substring survival')
-    plt.legend([f'Max {W}', f'Min {W}'])
+    plt.ylabel('max survived substring length')
+    plt.legend([f'Max', f'Min'])
     plt.grid()
     plt.ylim((0, 30000))
     plt.savefig(substr_surv_pdf_fn, format='pdf')
