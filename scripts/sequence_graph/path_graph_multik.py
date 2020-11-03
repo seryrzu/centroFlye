@@ -346,7 +346,6 @@ class PathMultiKGraph:
                         continue
                     if self.node2len[v] + 1 == len(seq):
                         new.add(v)
-                        break
                 for edge in self.nx_graph.out_edges(u, keys=True):
                     index = self.edge2index[edge]
                     seq = self.edge2seq[index]
@@ -355,7 +354,6 @@ class PathMultiKGraph:
                         continue
                     if self.node2len[v] + 1 == len(seq):
                         new.add(v)
-                        break
             self.unresolved |= new
             prev, new = new, set()
 
@@ -596,16 +594,16 @@ class PathMultiKGraph:
             index = self.edge2index[edge]
             seq = self.edge2seq[index]
             u, v, _ = edge
-            if u not in self.unresolved and \
-                    v not in self.unresolved and \
-                    len(seq) == self.node2len[u] == self.node2len[v]:
+            if len(seq) == self.node2len[u] or len(seq) == self.node2len[v]:
+                assert self.node2len[u] == self.node2len[v]
+                assert u not in self.unresolved and v not in self.unresolved
                 collapsed_edges.append(index)
         # remove collapsed edges
         [self.remove_edge(index=index) for index in collapsed_edges]
 
         self.nx_graph.remove_nodes_from(list(nx.isolates(self.nx_graph)))
         self._update_unresolved_vertices()
-        # self.assert_validity()
+        self.assert_validity()
 
     def transform_single_fast(self):
         if self.unresolved == set(self.nx_graph.nodes):
