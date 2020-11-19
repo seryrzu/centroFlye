@@ -327,11 +327,23 @@ class PathMultiKGraph:
                             out_index = fst_iterable(rest_out)
                             paired_in.add(loop)
                             paired_out.add(out_index)
+
                 for e_in in in_indexes:
                     for e_out in out_indexes:
                         if (e_in, e_out) in self.idb_mappings.pairindex2pos:
                             paired_in.add(e_in)
                             paired_out.add(e_out)
+
+                unpaired_in = set(in_indexes) - paired_in
+                unpaired_out = set(out_indexes) - paired_out
+                if len(unpaired_in) == 1 and len(unpaired_out) == 1:
+                    if len(set(in_indexes) - self.unique_edges) == 0 or \
+                            len(set(out_indexes) - self.unique_edges) == 0:
+                        unpaired_in_single = list(unpaired_in)[0]
+                        unpaired_out_single = list(unpaired_out)[0]
+                        paired_in.add(unpaired_in_single)
+                        paired_out.add(unpaired_out_single)
+
                 tips = (in_indexes - paired_in) | (out_indexes - paired_out)
 
                 if len(tips):
@@ -420,11 +432,15 @@ class PathMultiKGraph:
 
             ac_s2e = defaultdict(set)
             ac_e2s = defaultdict(set)
+            paired_in = set()
+            paired_out = set()
             for e_in in in_indexes:
                 for e_out in out_indexes:
                     if (e_in, e_out) in self.idb_mappings.pairindex2pos:
                         ac_s2e[e_in].add(e_out)
                         ac_e2s[e_out].add(e_in)
+                        paired_in.add(e_in)
+                        paired_out.add(e_out)
 
             loops = set(in_indexes) & set(out_indexes)
             if len(loops) == 1:
@@ -440,6 +456,16 @@ class PathMultiKGraph:
                         out_index = fst_iterable(rest_out)
                         ac_s2e[loop].add(out_index)
                         ac_e2s[out_index].add(loop)
+
+            unpaired_in = set(in_indexes) - paired_in
+            unpaired_out = set(out_indexes) - paired_out
+            if len(unpaired_in) == 1 and len(unpaired_out) == 1:
+                if len(set(in_indexes) - self.unique_edges) == 0 or \
+                        len(set(out_indexes) - self.unique_edges) == 0:
+                    unpaired_in_single = list(unpaired_in)[0]
+                    unpaired_out_single = list(unpaired_out)[0]
+                    ac_s2e[unpaired_in_single].add(unpaired_out_single)
+                    ac_e2s[unpaired_out_single].add(unpaired_in_single)
 
             merged = {}
             for i in ac_s2e:
