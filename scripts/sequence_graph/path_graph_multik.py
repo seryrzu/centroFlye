@@ -3,7 +3,7 @@
 # Released under the BSD license (see LICENSE file)
 
 import argparse
-from collections import defaultdict, Counter
+from collections import defaultdict
 import logging
 import math
 import os
@@ -12,13 +12,15 @@ import sys
 this_dirname = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
+import ahocorasick
+from ahocorapy.keywordtree import KeywordTree
 import networkx as nx
 import edlib
 
 from sequence_graph.path_graph import IDBMappings
 from standard_logger import get_logger
 from subprocess import call
-from utils.bio import read_bio_seqs, read_bio_seq, compress_homopolymer
+from utils.bio import read_bio_seqs, read_bio_seq, compress_homopolymer, RC
 from utils.git import get_git_revision_short_hash
 from utils.os_utils import smart_makedirs, expandpath
 from utils.various import fst_iterable
@@ -655,8 +657,28 @@ class PathMultiKGraph:
         if reffn is not None:
             ref = read_bio_seq(reffn)
             ref = compress_homopolymer(ref)
-            path, iscomplete, _ = self.align_ref(ref)
-            mult = Counter(path)
+            A = ahocorasick.Automaton()
+            # A = KeywordTree()
+            # seq2index = {}
+            for index, seq in self.edge2seq.items():
+                seq = ''.join(seq)
+                A.add_word(''.join(seq), index)
+                # A.add(seq)
+                # seq2index[seq] = index
+            A.make_automaton()
+            # A.finalize()
+            print('made automaton')
+
+            mult = defaultdict(lambda: [0, 0])
+            for end_pos, index in A.iter(ref):
+            # for seq, start_pos in A.search_all(ref):
+                # index = seq2index[seq]
+                mult[index][0] += 1
+            for end_pos, index in A.iter(RC(ref)):
+            # for seq, start_pos in A.search_all(RC(ref)):
+                # index = seq2index[seq]
+                mult[index][1] += 1
+
         if outfile[-3:] == 'dot':
             outfile = outfile[:-4]
         graph = nx.MultiDiGraph()
@@ -681,6 +703,22 @@ class PathMultiKGraph:
             # https://stackoverflow.com/a/3516106
             cmd = ['dot', '-Tpdf', dotfile, '-o', pdffile]
             call(cmd)
+
+    def align_ref2(self, ref):
+        A = ahocorasick.Automaton()
+        for index, seq in self.edge2seq.items():
+            A.add_word(''.join(seq), index)
+        A.make_automaton()
+        print('made automaton')
+
+        mult = defaultdict(lambda: [0, 0])
+        for end_pos, index in A.iter(ref):
+            start_pos = end_pos - len(self.edge2seq[index]) + 1
+            mult[index][0] += 1
+        for end_pos, index in A.iter(RC(ref)):
+            start_pos = end_pos - len(self.edge2seq[index]) + 1
+            mult[index][1] += 1
+        return mult
 
     def align_ref(self, ref, MAX_TIP_LEN=200000):
         ref = list(ref)
@@ -830,6 +868,21 @@ def main():
     logger.info(f'Finished increasing k')
     logger.info(f'# vertices = {nx.number_of_nodes(lpdb.nx_graph)}')
     logger.info(f'# edges = {nx.number_of_edges(lpdb.nx_graph)}')
+
+
+    outac = os.path.join(params.outdir, f'active_connections.txt')
+    logger.info(f'Active connections output to {outac}')
+    with open(outac, 'w') as f:
+        ac = lpdb.idb_mappings.get_active_connections()
+        ac = sorted(list(ac))
+        for i, j in ac:
+            print(f'{i} {j}', file=f)
+
+    outuniquedges = os.path.join(params.outdir, f'unique_edges.txt')
+    logger.info(f'Unique edges output to {outuniquedges}')
+    with open(outuniquedges, 'w') as f:
+        for index in sorted(list(lpdb.unique_edges)):
+            print(index, file=f)
 
     outdot = os.path.join(params.outdir, f'dbg_{k}-{lpdb.init_k+lpdb.niter}')
     logger.info(f'Writing final graph to {outdot}')
