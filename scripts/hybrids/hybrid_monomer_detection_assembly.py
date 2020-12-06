@@ -13,7 +13,6 @@ sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
 from joblib import Parallel, delayed
 import networkx as nx
-from tqdm import tqdm
 
 from sd_parser.sd_parser import SD_Report
 from standard_logger import get_logger
@@ -36,6 +35,7 @@ def parse_args():
     parser.add_argument("--max-sim", type=float, default=.95)
     parser.add_argument("--ident-mov-av-len", type=int, default=30)
     parser.add_argument("--min-moving-identity", type=int, default=.95)
+    parser.add_argument("--no-candidates-filtering", action='store_true')
     params = parser.parse_args()
     return params
 
@@ -44,6 +44,7 @@ def get_candidates(monoassembly,
                    min_sec_ident, max_ident_diff,
                    ident_mov_av_len,
                    min_moving_identity,
+                   no_candidates_filtering,
                    logger):
     candidates = []
     logger.info('Candidates:')
@@ -55,9 +56,7 @@ def get_candidates(monoassembly,
             continue
         mi = monoassembly.monoinstances[ident_mov_av_len+pos-1]
         ident_diff = abs(mi.identity - mi.sec_identity)
-        if mi.is_reliable() and \
-                mi.sec_identity >= min_sec_ident and \
-                ident_diff <= max_ident_diff:
+        if mi.is_reliable():
             a = mi.get_monoid()
             b = mi.get_secmonoid()
             mono_ind1, mono_ind2 = mi.get_monoindex(), mi.get_secmonoindex()
@@ -72,9 +71,12 @@ def get_candidates(monoassembly,
             # only work with clusters of size 1
             A, B = A[0], B[0]
 
-            candidates.append((pos, mi.nucl_segment, a, b, A, B))
-            logger.info(f'pos={pos} ident={mi.identity}, '
-                        f'sec_ident={mi.sec_identity} {a} {b}')
+            if no_candidates_filtering or \
+                (mi.sec_identity >= min_sec_ident and
+                 ident_diff <= max_ident_diff):
+                candidates.append((pos, mi.nucl_segment, a, b, A, B))
+                logger.info(f'pos={pos} ident={mi.identity}, '
+                            f'sec_ident={mi.sec_identity} {a} {b}')
     return candidates
 
 
@@ -91,9 +93,9 @@ def filter_hybrid_alignments(hybrid_aligns, candidates,
                 a, b = b, a
                 A, B = B, A
             hybrid = A[:jump[0]] + B[jump[1]:]
-            ident_AB = calc_identity(A, B)
-            ident_HA = calc_identity(hybrid, A)
-            ident_HB = calc_identity(hybrid, B)
+            ident_AB = calc_identity(A, B)[0]
+            ident_HA = calc_identity(hybrid, A)[0]
+            ident_HB = calc_identity(hybrid, B)[0]
             max_ident = max(ident_AB, ident_HA, ident_HB)
             if max_ident <= max_sim:
                 logger.info(f'pos={pos} a={a} b={b}')
@@ -151,7 +153,7 @@ def cluster_hybrids(hybrids2info, hybrids2pos, max_sim, logger):
         for h2, info2 in hybrids2info.items():
             if h1 <= h2:
                 continue
-            ident = calc_identity(h1, h2)
+            ident = calc_identity(h1, h2)[0]
             if ident >= max_sim:
                 ident_graph.add_edge(h1, h2)
                 logger.info(f'Ident {ident} b/w {info1} {info2}')
@@ -192,14 +194,17 @@ def extract_hybrids(monoassembly,
                     min_sec_ident, max_sim, max_ident_diff, score_mult,
                     ident_mov_av_len,
                     min_moving_identity,
+                    no_candidates_filtering,
                     threads, logger):
     candidates = get_candidates(monoassembly, min_sec_ident, max_ident_diff,
                                 ident_mov_av_len,
                                 min_moving_identity,
+                                no_candidates_filtering,
                                 logger)
     hybrid_aligns = \
-        Parallel(n_jobs=threads)(delayed(hybrid_alignment)(segm, A, B)
-                                 for _, segm, _, _, A, B in tqdm(candidates))
+        Parallel(n_jobs=threads, verbose=50)\
+            (delayed(hybrid_alignment)(segm, A, B)
+             for _, segm, _, _, A, B in candidates)
     hybrids2info, hybrids2pos = \
         filter_hybrid_alignments(hybrid_aligns, candidates,
                                  score_mult, max_sim, logger)
@@ -261,6 +266,7 @@ def main():
                         score_mult=params.score_mult,
                         ident_mov_av_len=params.ident_mov_av_len,
                         min_moving_identity=params.min_moving_identity,
+                        no_candidates_filtering=params.no_candidates_filtering,
                         threads=params.threads,
                         logger=logger)
     export_hybrids(hybrids2pos, hybrids2info, params.outdir, monomer_db)
