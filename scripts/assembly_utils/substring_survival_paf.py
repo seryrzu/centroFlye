@@ -104,7 +104,7 @@ def main():
     substr_surv_pdf_fn = os.path.join(params.outdir, 'substr_surv.pdf')
     surv = list(surv.values())
 
-    W = 10000
+    W = 100000
     plt.plot(max_filter1d_valid(surv, W=W))
     plt.plot(min_filter1d_valid(surv, W=W))
 
