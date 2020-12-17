@@ -20,7 +20,8 @@ import edlib
 from sequence_graph.path_graph import IDBMappings
 from standard_logger import get_logger
 from subprocess import call
-from utils.bio import read_bio_seqs, read_bio_seq, compress_homopolymer, RC
+from utils.bio import read_bio_seqs, read_bio_seq, compress_homopolymer, RC, \
+    write_bio_seqs
 from utils.git import get_git_revision_short_hash
 from utils.karp_rabin import RollingHash
 from utils.os_utils import smart_makedirs, expandpath
@@ -900,7 +901,12 @@ def main():
     logger.info(f'Writing final graph to {outdot}')
     lpdb.write_dot(outdot, compact=True,
                    reffn=params.ref, refhpc=params.refhpc)
-    logger.info(f'Finished writing final graph')
+    logger.info(f'Finished writing final graph (dot)')
+
+    outfasta = outdot + '.fasta'
+    logger.info(f'Writing graph edges to {outdot}')
+    edges = {key: ''.join(edge) for key, edge in lpdb.edge2seq.items()}
+    write_bio_seqs(outfasta, edges)
 
 
 if __name__ == "__main__":
