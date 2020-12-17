@@ -22,6 +22,7 @@ from standard_logger import get_logger
 from subprocess import call
 from utils.bio import read_bio_seqs, read_bio_seq, compress_homopolymer, RC
 from utils.git import get_git_revision_short_hash
+from utils.karp_rabin import RollingHash
 from utils.os_utils import smart_makedirs, expandpath
 from utils.various import fst_iterable
 
@@ -30,13 +31,12 @@ logger = logging.getLogger("centroFlye.sequence_graph.path_graph_multik")
 
 
 class PathMultiKGraph:
-    SATURATING_K = 40002
-
     def __init__(self, nx_graph,
                  edge2seq, edge2index, index2edge, node2len,
                  max_edge_index, max_node_index,
                  idb_mappings,
                  init_k,
+                 K,
                  unique_edges=None):
         self.nx_graph = nx_graph
         self.edge2seq = edge2seq
@@ -47,6 +47,7 @@ class PathMultiKGraph:
         self.max_node_index = max_node_index
         self.idb_mappings = idb_mappings
         self.init_k = init_k
+        self.SATURATING_K = K
         if unique_edges is None:
             unique_edges = set()
         self.unique_edges = unique_edges
@@ -140,7 +141,7 @@ class PathMultiKGraph:
                           raw_mappings=mappings)
 
     @classmethod
-    def fromDR(cls, db_fn, align_fn, k):
+    def fromDR(cls, db_fn, align_fn, k, K):
         class PerfectHash:
             hash2index = {}
             next_key = 0
@@ -212,7 +213,8 @@ class PathMultiKGraph:
                    max_node_index=ph.next_key,
                    init_k=k,
                    idb_mappings=idb_mappings,
-                   unique_edges=unique_edges)
+                   unique_edges=unique_edges,
+                   K=K)
 
     def move_edge(self, e1_st, e1_en, e1_key,
                   e2_st, e2_en, e2_key=None):
@@ -679,31 +681,28 @@ class PathMultiKGraph:
                     changed = True
         return mult
 
-    def write_dot(self, outfile, reffn=None, compact=False, export_pdf=True,):
+    def write_dot(self, outfile, reffn=None, refhpc=False,
+                  compact=False, export_pdf=True):
         if reffn is not None:
             ref = read_bio_seq(reffn)
-            ref = compress_homopolymer(ref)
-            A = ahocorasick.Automaton()
-            # A = KeywordTree()
-            # seq2index = {}
-            for index, seq in self.edge2seq.items():
-                seq = ''.join(seq)
-                A.add_word(''.join(seq), index)
-                # A.add(seq)
-                # seq2index[seq] = index
-            A.make_automaton()
-            # A.finalize()
-            print('made automaton')
+            if refhpc:
+                ref = compress_homopolymer(ref)
+            logger.info('Finished building kmer-index for reference')
 
             mult = defaultdict(lambda: [0, 0])
-            for end_pos, index in A.iter(ref):
-            # for seq, start_pos in A.search_all(ref):
-                # index = seq2index[seq]
-                mult[index][0] += 1
-            for end_pos, index in A.iter(RC(ref)):
-            # for seq, start_pos in A.search_all(RC(ref)):
-                # index = seq2index[seq]
-                mult[index][1] += 1
+            # for index, seq in self.edge2seq.items():
+            #     logger.info(f'Matching edge {index}')
+            #     match_seq(seq, 0)
+            #     match_seq(RC(seq), 1)
+
+            # for end_pos, index in A.iter(ref):
+            # # for seq, start_pos in A.search_all(ref):
+            #     # index = seq2index[seq]
+            #     mult[index][0] += 1
+            # for end_pos, index in A.iter(RC(ref)):
+            # # for seq, start_pos in A.search_all(RC(ref)):
+            #     # index = seq2index[seq]
+            #     mult[index][1] += 1
 
         if outfile[-3:] == 'dot':
             outfile = outfile[:-4]
@@ -729,22 +728,6 @@ class PathMultiKGraph:
             # https://stackoverflow.com/a/3516106
             cmd = ['dot', '-Tpdf', dotfile, '-o', pdffile]
             call(cmd)
-
-    def align_ref2(self, ref):
-        A = ahocorasick.Automaton()
-        for index, seq in self.edge2seq.items():
-            A.add_word(''.join(seq), index)
-        A.make_automaton()
-        print('made automaton')
-
-        mult = defaultdict(lambda: [0, 0])
-        for end_pos, index in A.iter(ref):
-            start_pos = end_pos - len(self.edge2seq[index]) + 1
-            mult[index][0] += 1
-        for end_pos, index in A.iter(RC(ref)):
-            start_pos = end_pos - len(self.edge2seq[index]) + 1
-            mult[index][1] += 1
-        return mult
 
     def align_ref(self, ref, MAX_TIP_LEN=200000):
         ref = list(ref)
@@ -862,6 +845,8 @@ def main():
                         help="Directory with DBG output")
     parser.add_argument("-o", "--outdir", required=True)
     parser.add_argument("--ref")
+    parser.add_argument("--refhpc", action='store_true')
+    parser.add_argument("-K", type=int, default=40002)
     params = parser.parse_args()
 
     params.dbg = expandpath(params.dbg)
@@ -885,7 +870,8 @@ def main():
         k = int(cmd[i+1]) + 1
     logger.info(f'init k = {k}')
     logger.info(f'Reading DBG output from {params.dbg}')
-    lpdb = PathMultiKGraph.fromDR(db_fn=db_fn, align_fn=align_fn, k=k)
+    lpdb = PathMultiKGraph.fromDR(db_fn=db_fn, align_fn=align_fn,
+                                  k=k, K=params.K)
     logger.info(f'# vertices = {nx.number_of_nodes(lpdb.nx_graph)}')
     logger.info(f'# edges = {nx.number_of_edges(lpdb.nx_graph)}')
     logger.info(f'Finished reading DBG output')
@@ -912,7 +898,8 @@ def main():
 
     outdot = os.path.join(params.outdir, f'dbg_{k}-{lpdb.init_k+lpdb.niter}')
     logger.info(f'Writing final graph to {outdot}')
-    lpdb.write_dot(outdot, compact=True, reffn=params.ref)
+    lpdb.write_dot(outdot, compact=True,
+                   reffn=params.ref, refhpc=params.refhpc)
     logger.info(f'Finished writing final graph')
 
 
