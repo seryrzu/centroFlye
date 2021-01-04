@@ -7,23 +7,20 @@ from collections import defaultdict
 import logging
 import math
 import os
+import subprocess
 import sys
 
 this_dirname = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(this_dirname, os.path.pardir))
 
-import ahocorasick
-from ahocorapy.keywordtree import KeywordTree
 import networkx as nx
-import edlib
 
 from sequence_graph.path_graph import IDBMappings
 from standard_logger import get_logger
 from subprocess import call
-from utils.bio import read_bio_seqs, read_bio_seq, compress_homopolymer, RC, \
+from utils.bio import read_bio_seqs, read_bio_seq, compress_homopolymer, \
     write_bio_seqs
 from utils.git import get_git_revision_short_hash
-from utils.karp_rabin import RollingHash
 from utils.os_utils import smart_makedirs, expandpath
 from utils.various import fst_iterable
 
@@ -682,31 +679,39 @@ class PathMultiKGraph:
                     changed = True
         return mult
 
-    def write_dot(self, outfile, reffn=None, refhpc=False,
+    def write_dot(self, outdir, reffn=None, refhpc=False,
                   compact=False, export_pdf=True):
         if reffn is not None:
+            # TODO make a parameter
+            exact_matcher_bin = '/Poppy/abzikadze/DR/bin/exact_matcher'
             ref = read_bio_seq(reffn)
             if refhpc:
                 ref = compress_homopolymer(ref)
-            logger.info('Finished building kmer-index for reference')
+            reffn_outfn = os.path.join(outdir, 'ref.fasta')
+            write_bio_seqs(reffn_outfn, {'ref': ref})
+            exact_matcher_outfn = os.path.join(outdir, 'edge_matching.tsv')
+            edges_fn = os.path.join(
+                outdir, f'dbg_{self.init_k}-{self.init_k+self.niter}.fasta')
+            exact_matcher_cmd = \
+                f'{exact_matcher_bin} --output {exact_matcher_outfn} ' \
+                f'--reference {reffn_outfn} --query {edges_fn}'
+            logger.info(f'Running exact matcher. Cmd: {exact_matcher_cmd}')
+            exact_matcher_cmd = exact_matcher_cmd.split(' ')
+
+            subprocess.call(exact_matcher_cmd)
 
             mult = defaultdict(lambda: [0, 0])
-            # for index, seq in self.edge2seq.items():
-            #     logger.info(f'Matching edge {index}')
-            #     match_seq(seq, 0)
-            #     match_seq(RC(seq), 1)
+            with open(exact_matcher_outfn) as f:
+                f.readline()
+                for line in f:
+                    line = line.strip().split('\t')
+                    _, index, pos, strand = line
+                    index, pos = int(index), int(pos)
+                    strand = strand != '+'  # strand == '-' => 0
+                    mult[index][strand] += 1
 
-            # for end_pos, index in A.iter(ref):
-            # # for seq, start_pos in A.search_all(ref):
-            #     # index = seq2index[seq]
-            #     mult[index][0] += 1
-            # for end_pos, index in A.iter(RC(ref)):
-            # # for seq, start_pos in A.search_all(RC(ref)):
-            #     # index = seq2index[seq]
-            #     mult[index][1] += 1
-
-        if outfile[-3:] == 'dot':
-            outfile = outfile[:-4]
+        outfile = os.path.join(outdir,
+                               f'dbg_{self.init_k}-{self.init_k+self.niter}')
         graph = nx.MultiDiGraph()
         for node in self.nx_graph.nodes():
             graph.add_node(node, label=f'{node} len={self.node2len[node]}')
@@ -718,6 +723,8 @@ class PathMultiKGraph:
             if reffn is not None:
                 # print(mult[index], mult_est[index])
                 # assert mult[index] == 0 or mult[index] >= mult_est[index]
+                if mult[index] == [0, 0]:
+                    logger.info(f'Warning: edge {index} has [0, 0] coverage')
                 label += f'\nmult_real={mult[index]}'
             graph.add_edge(*edge,
                            label=label,
@@ -729,115 +736,6 @@ class PathMultiKGraph:
             # https://stackoverflow.com/a/3516106
             cmd = ['dot', '-Tpdf', dotfile, '-o', pdffile]
             call(cmd)
-
-    def align_ref(self, ref, MAX_TIP_LEN=200000):
-        ref = list(ref)
-        path = []
-        coord = 0
-        coords = defaultdict(list)
-        for node in self.nx_graph.nodes():
-            in_degree = self.nx_graph.in_degree(node)
-            out_degree = self.nx_graph.out_degree(node)
-            if in_degree == 0 and out_degree == 1:
-                e_out = self.nx_graph.out_edges(node, keys=True)
-                e_out = list(e_out)[0]
-                end_nodelen = self.node2len[e_out[1]]
-                out_index = self.edge2index[e_out]
-                seq = self.edge2seq[out_index]
-                alignment = edlib.align(seq, ref, k=0,
-                                        task='locations',
-                                        mode='HW')
-                if len(alignment['locations']) == 1:
-                    path.append(out_index)
-                    st, en = alignment['locations'][0]
-                    en += 1
-                    print(st, en, en - st, len(seq))
-                    coord = en - end_nodelen
-                    coords[out_index].append((st, en))
-                    break
-        if len(path) == 0:
-            return
-        while True:
-            last_index = path[-1]
-            _, u, _ = self.index2edge[last_index]
-            nodelen = self.node2len[u]
-            out_edges = self.nx_graph.out_edges(u, keys=True)
-            if len(out_edges) == 0:
-                break
-            extended = False
-            for edge in out_edges:
-                index = self.edge2index[edge]
-                seq = self.edge2seq[index]
-                c = seq[nodelen]
-                if c == ref[coord+nodelen]:
-                    # print(index)
-                    refseq = ref[coord:coord+len(seq)]
-                    seq = seq[:len(refseq)]
-                    if refseq != seq:
-                        print(path)
-                        print(last_index, index)
-                        # print(''.join(refseq))
-                        # print(''.join(seq))
-                        print(len(refseq))
-                        print(len(seq))
-                        print(coord)
-                        for i, (a, b) in enumerate(zip(refseq, seq)):
-                            if a != b:
-                                print(i, a, b)
-                    assert refseq == seq
-                    path.append(index)
-                    end_nodelen = self.node2len[edge[1]]
-                    old_coord = coord
-                    coord += len(seq) - end_nodelen
-                    coords[index].append((old_coord, coord))
-                    extended = True
-                    break
-            if not extended:
-                break
-
-        print(len(ref) - end_nodelen - coord)
-        iscomplete = (len(ref) - end_nodelen - coord) < MAX_TIP_LEN
-        return path, iscomplete, coords
-
-    def _get_path(self, list_indexes):
-        if len(list_indexes) == 0:
-            return tuple()
-
-        path = []
-        fst_index = list_indexes[0]
-        path += self.edge2seq[fst_index]
-        for index in list_indexes[1:]:
-            string = self.edge2seq[index]
-            in_node = self.index2edge[index][0]
-            len_node = self.node2len[in_node]
-            assert path[-len_node:] == string[:len_node]
-            path += string[len_node:]
-        return tuple(path)
-
-    def get_paths_for_mappings(self):
-        paths = {}
-        for r_id, mapping in self.idb_mappings.mappings.items():
-            paths[r_id] = self._get_path(mapping)
-        return paths
-
-    def assert_validity_of_paths(self, reads):
-        paths = self.get_paths_for_mappings()
-        # print(set(paths.keys()) - set(reads.keys()))
-        print(set(reads.keys()) - set(paths.keys()))
-        # assert set(paths.keys()) == set(reads.keys())
-        for r_id in paths:
-            if r_id not in reads:
-                continue
-            path = ''.join(paths[r_id])
-            read = reads[r_id]
-            alignment = edlib.align(read, path, k=0, mode='HW')
-            if alignment['editDistance'] == -1:
-                print(r_id)
-                print(len(path), len(read), self.idb_mappings.mappings[r_id])
-                print(path)
-                print(read)
-                print(alignment)
-                break
 
 
 def main():
@@ -882,7 +780,6 @@ def main():
     logger.info(f'# vertices = {nx.number_of_nodes(lpdb.nx_graph)}')
     logger.info(f'# edges = {nx.number_of_edges(lpdb.nx_graph)}')
 
-
     outac = os.path.join(params.outdir, f'active_connections.txt')
     logger.info(f'Active connections output to {outac}')
     with open(outac, 'w') as f:
@@ -899,14 +796,15 @@ def main():
 
     outdot = os.path.join(params.outdir, f'dbg_{k}-{lpdb.init_k+lpdb.niter}')
     logger.info(f'Writing final graph to {outdot}')
-    lpdb.write_dot(outdot, compact=True,
-                   reffn=params.ref, refhpc=params.refhpc)
-    logger.info(f'Finished writing final graph (dot)')
 
     outfasta = outdot + '.fasta'
-    logger.info(f'Writing graph edges to {outdot}')
+    logger.info(f'Writing graph edges to {outfasta}')
     edges = {key: ''.join(edge) for key, edge in lpdb.edge2seq.items()}
     write_bio_seqs(outfasta, edges)
+
+    lpdb.write_dot(params.outdir, compact=True,
+                   reffn=params.ref, refhpc=params.refhpc)
+    logger.info(f'Finished writing final graph (dot)')
 
 
 if __name__ == "__main__":
