@@ -75,8 +75,10 @@ class PathMultiKGraph:
         for node in self.nx_graph.nodes:
             assert node in self.node2len
             nlen = self.node2len[node]
-            assert self.nx_graph.in_degree(node) != 1 or \
-                self.nx_graph.out_degree(node) != 1
+            if node not in self.unresolved:
+                assert self.nx_graph.in_degree(node) != 1 or \
+                    self.nx_graph.out_degree(node) != 1
+
             for in_edge in self.nx_graph.in_edges(node, keys=True):
                 e_index = self.edge2index[in_edge]
                 in_seq = self.edge2seq[e_index]
@@ -295,7 +297,11 @@ class PathMultiKGraph:
                  for e_out in self.nx_graph.out_edges(u, keys=True)])
             indegree = self.nx_graph.in_degree(u)
             outdegree = self.nx_graph.out_degree(u)
-            if indegree >= 2 and outdegree >= 2:
+            if indegree == 1 and outdegree == 1:
+                self_loop = in_indexes == out_indexes
+                assert self_loop
+                self.unresolved.add(u)
+            elif indegree >= 2 and outdegree >= 2:
                 # do not process anything at all
                 # self.unresolved.add(u)
 
