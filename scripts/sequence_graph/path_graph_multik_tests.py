@@ -340,3 +340,51 @@ assert pg.edge2seq == \
      6: ['G', 'A', 'A', 'G'],
      7: ['G', 'A', 'A', 'G'],
      8: ['G', 'A', 'A', 'T']}
+
+
+# graph with a loop
+
+class DBLoop4:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 1, string='CCCAA')
+    nx_graph.add_edge(1, 1, string='AAAAA')
+    nx_graph.add_edge(1, 2, string='AATTT')
+
+pg = PathMultiKGraph.fromDB(
+    DBLoop4(),
+    string_set={},
+    raw_mappings={0: ([(0, 1, 0),
+                       (1, 2, 0)],
+                      0, 0),
+                  1: ([(1, 1, 0),
+                       (1, 1, 0)],
+                      0, 0)})
+pg.transform_single()
+assert pg.unresolved == set([5])
+assert list(pg.nx_graph.edges) == [(0, 2, 0), (5, 5, 0)]
+assert pg.edge2seq == {0: list('CCCAATTT'), 1: list('AAAAA')}
+
+
+# graph with a loop
+
+class DBLoop5:
+    k = 3
+    nx_graph = nx.MultiDiGraph()
+    nx_graph.add_edge(0, 1, string='CCCAA')
+    nx_graph.add_edge(1, 1, string='AACAA')
+    nx_graph.add_edge(1, 2, string='AATTT')
+
+pg = PathMultiKGraph.fromDB(
+    DBLoop5(),
+    string_set={},
+    raw_mappings={0: ([(0, 1, 0),
+                       (1, 2, 0)],
+                      0, 0),
+                  1: ([(1, 1, 0),
+                       (1, 1, 0)],
+                      0, 0)})
+pg.transform_single()
+assert pg.unresolved == set([5])
+assert list(pg.nx_graph.edges) == [(0, 2, 0), (5, 5, 0)]
+assert pg.edge2seq == {0: list('CCCAATTT'), 1: list('AACAAC')}

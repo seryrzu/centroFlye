@@ -91,6 +91,7 @@ class IDBMappings:
 
     def merge(self, st, en):
         # merge en into st
+        assert st != en
         keep = set()
         for r_id, s in self.index2pos[en]:
             if s.prev is None:

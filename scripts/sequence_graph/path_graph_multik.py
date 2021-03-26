@@ -70,6 +70,7 @@ class PathMultiKGraph:
         for i, j in ac:
             _, u, _ = self.index2edge[i]
             v, _, _ = self.index2edge[j]
+            # print(i, j, self.index2edge[i], self.index2edge[j])
             assert u == v
 
         for node in self.nx_graph.nodes:
@@ -475,9 +476,11 @@ class PathMultiKGraph:
                     ac_s2e[unpaired_in_single].add(unpaired_out_single)
                     ac_e2s[unpaired_out_single].add(unpaired_in_single)
 
+            # print(u, ac_s2e, ac_e2s)
             merged = {}
             for i in ac_s2e:
                 for j in ac_s2e[i]:
+                    # print(u, i, j, ac_s2e[i], ac_e2s[j])
                     if i in merged:
                         i = merged[i]
                     if j in merged:
@@ -488,8 +491,14 @@ class PathMultiKGraph:
                     out_seq = self.edge2seq[j]
                     assert in_seq[-nlen:] == out_seq[:nlen]
                     if len(ac_s2e[i]) == len(ac_e2s[j]) == 1:
-                        self.merge_edges(e_i, e_j)
-                        merged[j] = i
+                        if e_i != e_j:
+                            self.merge_edges(e_i, e_j)
+                            merged[j] = i
+                        else:
+                            # isolated loop
+                            self.move_edge(*e_i, e_i[0], e_i[0])
+                            if in_seq[-nlen-1:] != in_seq[:nlen+1]:
+                                self.edge2seq[i].append(in_seq[nlen])
                     elif len(ac_s2e[i]) >= 2 and len(ac_e2s[j]) >= 2:
                         seq = in_seq[-nlen-1:] + [out_seq[nlen]]
                         assert len(seq) == nlen + 2
